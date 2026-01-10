@@ -16,20 +16,15 @@ export function MarketView({ market, userBet }: MarketViewProps) {
   const isActive = timeRemaining > 0 && !market.isClosed;
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-lg p-6 max-w-2xl mx-auto">
-      <div className="text-center mb-6">
-        <h1 className="text-4xl font-bold text-white mb-2">BTC Prediction Market</h1>
-        <p className="text-white/70">Predict if BTC will be above or below target price</p>
-      </div>
-
+    <div className="glass-strong rounded-xl p-6 max-w-3xl mx-auto border border-amber-200/60 shadow-md">
       <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="bg-white/10 rounded-lg p-4">
-          <p className="text-sm text-white/70 mb-1">Target Price</p>
-          <p className="text-2xl font-bold text-white">${market.targetPrice.toLocaleString()}</p>
+        <div className="glass rounded-lg p-4 border border-amber-200/50">
+          <p className="text-xs text-slate-500 mb-1.5">Target Price</p>
+          <p className="text-2xl font-semibold text-slate-800">${market.targetPrice.toLocaleString()}</p>
         </div>
-        <div className="bg-white/10 rounded-lg p-4">
-          <p className="text-sm text-white/70 mb-1">Time Remaining</p>
-          <p className="text-2xl font-bold text-white">
+        <div className="glass rounded-lg p-4 border border-amber-200/50">
+          <p className="text-xs text-slate-500 mb-1.5">Time Remaining</p>
+          <p className="text-2xl font-semibold text-slate-800">
             {isActive
               ? `${Math.floor(timeRemaining / 1000)}s`
               : market.isClosed
@@ -40,47 +35,50 @@ export function MarketView({ market, userBet }: MarketViewProps) {
       </div>
 
       {market.isClosed && market.finalPrice !== undefined && (
-        <div className="mb-6 p-4 bg-purple-500/20 border border-purple-400/50 rounded-lg">
-          <p className="text-sm text-white/70 mb-1">Final Price</p>
-          <p className="text-3xl font-bold text-white">${market.finalPrice.toLocaleString()}</p>
-          <p className="text-sm text-white/70 mt-2">
-            Result: {market.finalPrice >= market.targetPrice ? 'ABOVE' : 'BELOW'} target
+        <div className="mb-6 p-4 glass rounded-lg border border-amber-200/50">
+          <p className="text-xs text-slate-500 mb-1.5">Final Price</p>
+          <p className="text-3xl font-semibold text-slate-800 mb-2">${market.finalPrice.toLocaleString()}</p>
+          <p className="text-sm text-slate-600">
+            Result: <span className="font-medium text-slate-800">{market.finalPrice >= market.targetPrice ? 'ABOVE' : 'BELOW'}</span> target
           </p>
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="bg-green-500/20 border border-green-400/50 rounded-lg p-4">
-          <p className="text-sm text-white/70 mb-1">Above Pool</p>
-          <p className="text-xl font-bold text-green-300">
-            {market.aboveBets.toLocaleString()} tokens
+        <div className="glass rounded-lg p-4 border border-amber-200/50">
+          <p className="text-xs text-slate-500 mb-1.5">Above Pool</p>
+          <p className="text-xl font-semibold text-slate-800">
+            {market.aboveBets.toLocaleString()}
           </p>
+          <p className="text-xs text-slate-500 mt-0.5">tokens</p>
         </div>
-        <div className="bg-red-500/20 border border-red-400/50 rounded-lg p-4">
-          <p className="text-sm text-white/70 mb-1">Below Pool</p>
-          <p className="text-xl font-bold text-red-300">
-            {market.belowBets.toLocaleString()} tokens
+        <div className="glass rounded-lg p-4 border border-amber-200/50">
+          <p className="text-xs text-slate-500 mb-1.5">Below Pool</p>
+          <p className="text-xl font-semibold text-slate-800">
+            {market.belowBets.toLocaleString()}
           </p>
+          <p className="text-xs text-slate-500 mt-0.5">tokens</p>
         </div>
       </div>
 
-      <div className="bg-white/10 rounded-lg p-4 mb-6">
-        <p className="text-sm text-white/70 mb-1">Total Pool</p>
-        <p className="text-3xl font-bold text-white">{market.totalPool.toLocaleString()} tokens</p>
+      <div className="glass rounded-lg p-4 mb-6 border border-amber-200/50">
+        <p className="text-xs text-slate-500 mb-1.5">Total Pool</p>
+        <p className="text-3xl font-semibold text-gradient">{market.totalPool.toLocaleString()}</p>
+        <p className="text-xs text-slate-500 mt-0.5">tokens</p>
       </div>
 
       {userBet && (
-        <div className="bg-purple-500/20 border border-purple-400/50 rounded-lg p-4">
-          <p className="text-sm text-white/70 mb-2">Your Bet</p>
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="text-lg font-semibold text-white">
-                {userBet.direction.toUpperCase()} - {userBet.amount} tokens
+        <div className="glass rounded-lg p-4 border border-amber-200/50">
+          <p className="text-xs text-slate-500 mb-2">Your Bet</p>
+          <div>
+            <p className="text-lg font-semibold text-slate-800 mb-1">
+              {userBet.direction.toUpperCase()} - {userBet.amount} tokens
+            </p>
+            {userBet.claimed && (
+              <p className="text-sm text-emerald-600 flex items-center gap-1">
+                <span>✓</span> Reward claimed
               </p>
-              {userBet.claimed && (
-                <p className="text-sm text-green-300 mt-1">✓ Reward claimed</p>
-              )}
-            </div>
+            )}
           </div>
         </div>
       )}

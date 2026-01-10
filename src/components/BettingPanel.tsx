@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import { BetDirection } from '../types';
 import { useMarket } from '../hooks/useMarket';
-import { useWallet } from '../hooks/useWallet';
+import { useWalletStore } from '../store/walletStore';
 
 export function BettingPanel() {
-  const { wallet } = useWallet();
+  const { wallet } = useWalletStore();
   const { marketState, placeBet, claimReward, isLoading, error } = useMarket();
   const [direction, setDirection] = useState<BetDirection>('above');
   const [amount, setAmount] = useState<string>('10');
@@ -55,8 +55,8 @@ export function BettingPanel() {
 
   if (!isActive && !canClaim) {
     return (
-      <div className="bg-white/10 backdrop-blur-md rounded-lg p-6 max-w-md mx-auto">
-        <p className="text-white/70 text-center">
+      <div className="glass-strong rounded-lg p-6 max-w-md mx-auto border border-amber-200/60 shadow-md">
+        <p className="text-slate-600 text-center">
           {market.isClosed ? 'Market is closed' : 'Market has ended'}
         </p>
       </div>
@@ -64,52 +64,52 @@ export function BettingPanel() {
   }
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-lg p-6 max-w-md mx-auto">
+    <div className="glass-strong rounded-lg p-6 max-w-md mx-auto border border-amber-200/60 shadow-md">
       {error && (
-        <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded text-red-200 text-sm">
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
           {error}
         </div>
       )}
 
       {canClaim ? (
         <div className="text-center">
-          <p className="text-white mb-4">You can claim your reward!</p>
+          <p className="text-slate-800 mb-4 font-medium">You can claim your reward!</p>
           <button
             onClick={handleClaim}
             disabled={isLoading}
-            className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-lg transition shadow-lg disabled:opacity-50"
+            className="w-full px-6 py-3 bg-saffron hover:opacity-90 text-white font-medium rounded-lg transition-all shadow-sm disabled:opacity-50"
           >
             {isLoading ? 'Claiming...' : 'Claim Reward'}
           </button>
         </div>
       ) : hasBet ? (
-        <div className="text-center">
-          <p className="text-white mb-2">You already placed a bet</p>
-          <p className="text-white/70 text-sm">
+        <div className="text-center p-4 glass rounded-lg border border-amber-200/50">
+          <p className="text-slate-800 mb-1 font-medium">You already placed a bet</p>
+          <p className="text-slate-600 text-sm">
             {userBet.direction.toUpperCase()} - {userBet.amount} tokens
           </p>
         </div>
       ) : (
         <div className="space-y-4">
           <div>
-            <p className="text-white font-semibold mb-3">Choose Direction</p>
+            <p className="text-slate-800 font-medium mb-3 text-sm">Choose Direction</p>
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setDirection('above')}
-                className={`px-6 py-4 rounded-lg font-semibold transition ${
+                className={`px-4 py-3 rounded-lg font-medium transition-all ${
                   direction === 'above'
-                    ? 'bg-green-600 text-white shadow-lg'
-                    : 'bg-white/20 text-white/70 hover:bg-white/30'
+                    ? 'bg-emerald-500 text-white border border-emerald-600 shadow-sm'
+                    : 'glass text-slate-700 hover:bg-white/80 border border-amber-200/50'
                 }`}
               >
                 ABOVE
               </button>
               <button
                 onClick={() => setDirection('below')}
-                className={`px-6 py-4 rounded-lg font-semibold transition ${
+                className={`px-4 py-3 rounded-lg font-medium transition-all ${
                   direction === 'below'
-                    ? 'bg-red-600 text-white shadow-lg'
-                    : 'bg-white/20 text-white/70 hover:bg-white/30'
+                    ? 'bg-red-500 text-white border border-red-600 shadow-sm'
+                    : 'glass text-slate-700 hover:bg-white/80 border border-amber-200/50'
                 }`}
               >
                 BELOW
@@ -118,7 +118,7 @@ export function BettingPanel() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               Bet Amount (tokens)
             </label>
             <input
@@ -127,23 +127,23 @@ export function BettingPanel() {
               onChange={(e) => setAmount(e.target.value)}
               min="1"
               max={wallet.balance}
-              className="w-full px-4 py-2 rounded-lg bg-white/20 text-white placeholder-white/50 border border-white/30 focus:outline-none focus:ring-2 focus:ring-purple-400"
+              className="w-full px-4 py-2.5 rounded-lg glass border border-amber-200/50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 transition-all"
             />
-            <p className="text-xs text-white/60 mt-1">
-              Balance: {wallet.balance.toLocaleString()} tokens
+            <p className="text-xs text-slate-500 mt-1.5">
+              Balance: <span className="font-medium text-slate-700">{wallet.balance.toLocaleString()}</span> tokens
             </p>
           </div>
 
           <button
             onClick={handleBet}
             disabled={isLoading || !isActive}
-            className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition shadow-lg disabled:opacity-50"
+            className="w-full px-6 py-3 bg-saffron hover:opacity-90 text-white font-medium rounded-lg transition-all shadow-sm disabled:opacity-50"
           >
             {isLoading ? 'Placing Bet...' : 'Place Bet'}
           </button>
 
-          <p className="text-xs text-white/60 text-center">
-            Transaction will be signed automatically. No popups!
+          <p className="text-xs text-slate-500 text-center">
+            Transaction will be signed automatically
           </p>
         </div>
       )}
