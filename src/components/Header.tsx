@@ -37,38 +37,40 @@ export function Header() {
 
   return (
     <header className="bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-orange-500/20">
-      <div className="container mx-auto px-6 py-3 max-w-full">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <div className="container mx-auto px-4 sm:px-6 py-3 max-w-full">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center flex-shrink-0">
                 <span className="text-white font-bold text-sm">S</span>
               </div>
-              <h1 className="text-lg font-semibold text-orange-400 tracking-tight">
+              <h1 className="text-base sm:text-lg font-semibold text-orange-400 tracking-tight">
                 Signals
               </h1>
             </div>
-            <span className="text-xs px-2 py-0.5 bg-orange-500/10 text-orange-400 rounded-md font-medium border border-orange-500/20">
+            <span className="text-[10px] sm:text-xs px-2 py-0.5 bg-orange-500/10 text-orange-400 rounded-md font-medium border border-orange-500/20 whitespace-nowrap">
               Conway Testnet
             </span>
           </div>
 
           {wallet && (
-            <div className="flex items-center gap-3 relative">
-              <div className="text-right hidden sm:block pr-3 border-r border-orange-500/20">
+            <div className="flex items-center gap-2 sm:gap-3 relative">
+              <div className="text-right hidden sm:block pr-2 sm:pr-3 border-r border-orange-500/20">
                 {username && (
-                  <p className="text-sm font-medium text-orange-300 mb-0.5">{username}</p>
+                  <p className="text-xs sm:text-sm font-medium text-orange-300 mb-0.5 truncate max-w-[120px] sm:max-w-none">
+                    {username}
+                  </p>
                 )}
                 <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse"></div>
-                  <p className="text-xs font-mono text-orange-400">
+                  <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse flex-shrink-0"></div>
+                  <p className="text-[10px] sm:text-xs font-mono text-orange-400 truncate">
                     {wallet.address.slice(0, 8)}...{wallet.address.slice(-6)}
                   </p>
                 </div>
                 {wallet.chainId && (
                   <button
                     onClick={() => setShowDetails(!showDetails)}
-                    className="text-xs text-orange-400 hover:text-orange-300 mt-1 underline transition-colors"
+                    className="text-[10px] sm:text-xs text-orange-400 hover:text-orange-300 mt-1 underline transition-colors"
                   >
                     {showDetails ? 'Hide' : 'View'} Details
                   </button>
@@ -76,24 +78,24 @@ export function Header() {
               </div>
               
               {showDetails && wallet.chainId && (
-                <div className="absolute right-0 top-full mt-2 w-80 bg-black/90 backdrop-blur-md rounded-lg border border-orange-500/20 z-30 shadow-xl p-4 animate-fade-in">
-                  <div className="space-y-3">
+                <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-black/90 backdrop-blur-md rounded-lg border border-orange-500/20 z-30 shadow-xl p-3 sm:p-4 animate-fade-in">
+                  <div className="space-y-2 sm:space-y-3">
                     <div>
-                      <p className="text-xs text-slate-400 mb-1">Wallet Address</p>
-                      <p className="text-xs font-mono text-orange-300 break-all">{wallet.address}</p>
+                      <p className="text-[10px] sm:text-xs text-slate-400 mb-1">Wallet Address</p>
+                      <p className="text-[10px] sm:text-xs font-mono text-orange-300 break-all">{wallet.address}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-400 mb-1">Microchain ID</p>
-                      <p className="text-xs font-mono text-orange-300 break-all">{wallet.chainId}</p>
-                      <p className="text-xs text-orange-400 mt-1 flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <p className="text-[10px] sm:text-xs text-slate-400 mb-1">Microchain ID</p>
+                      <p className="text-[10px] sm:text-xs font-mono text-orange-300 break-all">{wallet.chainId}</p>
+                      <p className="text-[10px] sm:text-xs text-orange-400 mt-1 flex items-center gap-1">
+                        <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
                         Chain claimed from faucet
                       </p>
                     </div>
                     <div className="pt-2 border-t border-orange-500/20">
-                      <p className="text-xs text-slate-400">
+                      <p className="text-[10px] sm:text-xs text-slate-400">
                         Network: <span className="text-orange-400">Conway Testnet</span>
                       </p>
                     </div>
@@ -117,25 +119,25 @@ export function Header() {
                       className="fixed inset-0 z-10" 
                       onClick={() => setShowMenu(false)}
                     ></div>
-                    <div className="absolute right-0 mt-2 w-48 bg-black/90 backdrop-blur-md rounded-lg border border-orange-500/20 z-20 overflow-hidden shadow-xl animate-fade-in">
+                    <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-black/90 backdrop-blur-md rounded-lg border border-orange-500/20 z-20 overflow-hidden shadow-xl animate-fade-in">
                       <button
                         onClick={handleExport}
-                        className="w-full px-4 py-2.5 text-left text-sm text-orange-300 hover:bg-orange-500/10 transition-colors flex items-center gap-2"
+                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-xs sm:text-sm text-orange-300 hover:bg-orange-500/10 transition-colors flex items-center gap-2"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
-                        Export Wallet
+                        <span className="truncate">Export Wallet</span>
                       </button>
                       <div className="h-px bg-orange-500/20"></div>
                       <button
                         onClick={handleDisconnect}
-                        className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
+                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-xs sm:text-sm text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                         </svg>
-                        Disconnect
+                        <span className="truncate">Disconnect</span>
                       </button>
                     </div>
                   </>

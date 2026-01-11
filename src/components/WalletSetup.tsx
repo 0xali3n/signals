@@ -79,8 +79,9 @@ export function WalletSetup() {
         throw new Error('Invalid wallet format');
       }
 
-             // Save and connect wallet
-             await setWallet(importedWallet);
+      // Save and connect wallet
+      await setWallet(importedWallet);
+      setIsImporting(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to import wallet. Please check your file and try again.');
       setIsImporting(false);
@@ -108,20 +109,20 @@ export function WalletSetup() {
   }
 
   return (
-    <div className="glass-strong rounded-xl p-8 max-w-md mx-auto border border-amber-200/60 shadow-md">
-      <h2 className="text-xl font-semibold mb-6 text-slate-800 text-center">Connect Your Microchain</h2>
+    <div className="glass-strong rounded-xl p-6 sm:p-8 max-w-md mx-auto border border-amber-200/60 shadow-md">
+      <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-slate-800 text-center">Connect Your Microchain</h2>
       
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs sm:text-sm">
           {error}
         </div>
       )}
 
       {!showImport ? (
-        <div className="space-y-6">
-          <div className="text-center mb-6">
-            <h3 className="text-lg font-semibold mb-2 text-slate-800">Secure Your Microchain</h3>
-            <p className="text-sm text-slate-600">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="text-center mb-4 sm:mb-6">
+            <h3 className="text-base sm:text-lg font-semibold mb-2 text-slate-800">Secure Your Microchain</h3>
+            <p className="text-xs sm:text-sm text-slate-600">
               Create a new wallet or import an existing one
             </p>
           </div>
@@ -129,7 +130,7 @@ export function WalletSetup() {
           <button
             onClick={handleCreate}
             disabled={isCreating}
-            className="w-full px-6 py-3 bg-saffron hover:opacity-90 text-white font-medium rounded-lg transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full px-4 sm:px-6 py-2.5 sm:py-3 bg-saffron hover:opacity-90 text-white text-sm sm:text-base font-medium rounded-lg transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isCreating ? (
               <>

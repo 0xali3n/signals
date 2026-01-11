@@ -12,7 +12,8 @@ function App() {
 
   useEffect(() => {
     initialize();
-  }, [initialize]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   // Show loading only during initial app load, not during wallet creation
   if (isLoading && creationStep === 'idle' && !wallet) {

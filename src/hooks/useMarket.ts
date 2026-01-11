@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Market, Bet, BetDirection, MarketState } from '../types';
-// import { callApplication } from '../utils/linera'; // TODO: Implement Linera integration
 import { useWalletStore } from '../store/walletStore';
 
 const MOCK_MARKET: Market = {
