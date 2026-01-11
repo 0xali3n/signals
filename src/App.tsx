@@ -4,8 +4,7 @@ import { useWalletStore } from './store/walletStore';
 import { useMarket } from './hooks/useMarket';
 import { Header } from './components/Header';
 import { WalletSetup } from './components/WalletSetup';
-import { MarketView } from './components/MarketView';
-import { BettingPanel } from './components/BettingPanel';
+import { GameView } from './components/GameView';
 
 function App() {
   const { wallet, isLoading, initialize, creationStep } = useWalletStore();
@@ -28,25 +27,21 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black">
       <Header />
       
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        {!wallet || (creationStep !== 'idle' && creationStep !== 'complete') ? (
-          <div className="flex items-center justify-center min-h-[calc(100vh-120px)]">
-            <WalletSetup />
-          </div>
+      {!wallet || (creationStep !== 'idle' && creationStep !== 'complete') ? (
+        <div className="flex items-center justify-center min-h-[calc(100vh-80px)]">
+          <WalletSetup />
+        </div>
         ) : (
-          <div className="space-y-6">
-            <MarketView 
+          <div className="fixed inset-0 top-16 pb-20">
+            <GameView 
               market={marketState.market} 
               userBet={marketState.userBet}
             />
-            
-            <BettingPanel />
           </div>
         )}
-      </div>
     </div>
   );
 }

@@ -21,12 +21,17 @@
 
 @layer base {
   body {
-    @apply bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100 text-slate-900;
+    @apply bg-gradient-to-br from-slate-900 via-slate-950 to-black text-slate-100;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
       'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
       sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Cyberpunk font for game view */
+  .cyberpunk-font {
+    font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
   }
 }
 
