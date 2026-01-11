@@ -79,23 +79,8 @@ export function WalletSetup() {
         throw new Error('Invalid wallet format');
       }
 
-      // Log import details for verification
-      console.log('Importing wallet:', {
-        address: importedWallet.address,
-        hasChainId: !!importedWallet.chainId,
-        chainId: importedWallet.chainId,
-        balance: importedWallet.balance,
-      });
-
-      // Save and connect wallet
-      await setWallet(importedWallet);
-      
-      // If chainId exists, wallet is fully restored
-      if (importedWallet.chainId) {
-        console.log('✅ Wallet fully restored with microchain ID');
-      } else {
-        console.warn('⚠️ Wallet imported but no chainId found - user may need to claim chain again');
-      }
+             // Save and connect wallet
+             await setWallet(importedWallet);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to import wallet. Please check your file and try again.');
       setIsImporting(false);

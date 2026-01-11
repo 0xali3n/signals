@@ -29,16 +29,11 @@ export async function createWalletFromFaucet(): Promise<Wallet> {
   try {
     await initLineraClient();
     
-    console.log('Initializing faucet with URL:', CONWAY_FAUCET_URL);
-    
     // Create Faucet instance
     const faucet = new Faucet(CONWAY_FAUCET_URL);
     
     // Create wallet from faucet
-    console.log('Requesting wallet from faucet...');
     const wallet = await faucet.createWallet();
-    
-    console.log('Wallet created from faucet');
     return wallet;
   } catch (error) {
     console.error('Faucet error:', error);
@@ -60,13 +55,10 @@ export async function claimChainFromFaucet(
   try {
     await initLineraClient();
     
-    console.log('Claiming chain for owner:', owner);
     const faucet = new Faucet(CONWAY_FAUCET_URL);
   
     // Claim chain - returns chain ID
     const chainId = await faucet.claimChain(wallet, owner);
-    
-    console.log('Chain claimed successfully, chainId:', chainId);
     return chainId;
   } catch (error) {
     console.error('Chain claim error:', error);
@@ -79,12 +71,12 @@ export async function claimChainFromFaucet(
  * 
  * @param wallet - Linera Wallet instance
  * @param privateKey - Private key string
- * @param options - Optional client options (skipProcessInbox, etc.)
+ * @param options - Optional client options (skipProcessInbox, validatorUrl, etc.)
  */
 export async function createClient(
   wallet: Wallet,
   privateKey: string,
-  options?: { skipProcessInbox?: boolean }
+  options?: { skipProcessInbox?: boolean; validatorUrl?: string }
 ): Promise<Client> {
   await initLineraClient();
   
@@ -94,9 +86,11 @@ export async function createClient(
   // Create client with wallet and signer
   // Default to skipProcessInbox: true to avoid async processing issues
   // User can explicitly set skipProcessInbox: false if needed
-  const clientOptions = options 
-    ? { skipProcessInbox: options.skipProcessInbox ?? true }
-    : { skipProcessInbox: true };
+  // Default validatorUrl to CONWAY_VALIDATOR_URL if not provided
+  const clientOptions: any = {
+    skipProcessInbox: options?.skipProcessInbox ?? true,
+    validatorUrl: options?.validatorUrl ?? CONWAY_VALIDATOR_URL,
+  };
   
   const client = new Client(
     wallet,

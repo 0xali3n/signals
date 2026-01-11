@@ -29,16 +29,13 @@ interface WalletState {
   lineraWalletInstance: any | null; // Store Linera Wallet instance (not serialized)
   creationStep: CreationStep;
   creationMessage: string | null;
-
   // Actions
   initialize: () => Promise<void>;
   createWallet: () => Promise<Wallet>;
   deleteWallet: () => Promise<void>;
   setUsername: (name: string) => void;
-  updateBalance: (balance: number) => void;
   setWallet: (wallet: Wallet | null) => Promise<void>;
   clearError: () => void;
-  fetchBalance: () => Promise<void>;
   setLineraWallet: (wallet: any) => void;
   setCreationStep: (step: CreationStep, message?: string) => void;
 }
@@ -70,8 +67,7 @@ export const useWalletStore = create<WalletState>()(
             isLoading: false,
           });
 
-          // Don't fetch balance on init - it causes memory errors
-          // Balance can be fetched on demand when needed
+          // Don't fetch balance on init - user can refresh manually
         } catch (err) {
           set({
             error: err instanceof Error ? err.message : "Failed to load wallet",
@@ -181,31 +177,6 @@ export const useWalletStore = create<WalletState>()(
         set({ lineraWalletInstance: wallet });
       },
 
-      fetchBalance: async () => {
-        const { wallet } = get();
-        if (!wallet || !wallet.chainId || !wallet.privateKey) {
-          console.warn(
-            "Cannot fetch balance: missing wallet, chainId, or privateKey"
-          );
-          return;
-        }
-
-        // For now, skip balance fetching to avoid memory errors
-        // The balance from faucet is typically 1000000000000000000 (1e18) tokens
-        // We'll set a placeholder until we can properly fix the WASM memory issues
-        console.log("Balance fetch disabled to prevent memory errors");
-        console.log("Faucet typically provides 1000000000000000000 tokens");
-
-        // Set a placeholder balance (1 token = 1e18 in smallest unit)
-        // This is a temporary workaround until WASM memory issues are resolved
-        const placeholderBalance = 1000; // Show 1000 tokens as placeholder
-        get().updateBalance(placeholderBalance);
-
-        // TODO: Fix WASM memory management to enable real balance fetching
-        // The issue is with how we're managing Client/Wallet lifecycle
-        // Need to properly call free() on WASM objects and manage single instance
-      },
-
       setWallet: async (wallet: Wallet | null) => {
         if (wallet) {
           await saveWallet(wallet);
@@ -223,15 +194,6 @@ export const useWalletStore = create<WalletState>()(
       setUsername: (name: string) => {
         setUsernameStorage(name);
         set({ username: name });
-      },
-
-      updateBalance: (balance: number) => {
-        const { wallet } = get();
-        if (wallet) {
-          const updated = { ...wallet, balance };
-          set({ wallet: updated });
-          saveWallet(updated);
-        }
       },
 
       clearError: () => set({ error: null }),

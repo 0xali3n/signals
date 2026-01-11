@@ -41,15 +41,11 @@ export async function createWalletWithFaucet(lineraWallet?: any): Promise<{ addr
     // Step 2: Create Linera wallet from faucet (or reuse provided one)
     let walletInstance = lineraWallet;
     if (!walletInstance) {
-      console.log('Creating wallet from faucet...');
       walletInstance = await createWalletFromFaucet();
     }
     
     // Step 3: Claim chain from faucet with test tokens
-    console.log('Claiming chain from faucet...');
     const chainId = await claimChainFromFaucet(walletInstance, address);
-    
-    console.log('Wallet created successfully, chainId:', chainId);
     return { address, privateKey, chainId, lineraWallet: walletInstance };
   } catch (error) {
     console.error('Failed to create wallet with faucet:', error);

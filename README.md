@@ -26,10 +26,11 @@ Users predict whether BTC price will be **ABOVE** or **BELOW** a target price at
 
 ### UI Components
 
-- ✅ **Header**: Displays wallet address, balance, chainId, and quick actions
-- ✅ **Wallet Setup**: Creation and import interface
+- ✅ **Header**: Displays wallet address, chainId, and quick actions (export/disconnect)
+- ✅ **Wallet Setup**: Creation and import interface with file upload
 - ✅ **Wallet Details**: View full address, microchain ID, and network info
-- ✅ **Market View**: Market information display
+- ✅ **Wallet Creation Progress**: Step-by-step progress UI with real-time status
+- ✅ **Market View**: Market information display (UI ready)
 - ✅ **Betting Panel**: Betting interface (UI ready)
 
 ### Integration
@@ -37,7 +38,8 @@ Users predict whether BTC price will be **ABOVE** or **BELOW** a target price at
 - ✅ **Linera Web Client**: Using `@linera/client` v0.15.8
 - ✅ **Faucet Connection**: Connected to `https://faucet.testnet-conway.linera.net`
 - ✅ **Chain Management**: Microchain ID stored and displayed
-- ✅ **State Management**: Zustand for wallet state
+- ✅ **State Management**: Zustand for persistent wallet state
+- ✅ **UI Polish**: Smooth animations, transitions, and premium design (saffron theme)
 
 ## 📦 Installation
 
@@ -81,6 +83,11 @@ src/
 - **Storage**: localStorage (browser-only, no server)
 - **Import/Export**: Full wallet backup including microchain ID
 - **Verification**: Address validated against private key
+- **Progress UI**: Real-time step-by-step wallet creation feedback
+
+## ⚠️ Known Limitations
+
+- **Balance Display**: Temporarily removed due to validator URL configuration issues in the Linera client library. The Wallet instance from the faucet appears to have a hardcoded validator URL that overrides client options. Balance functionality will be re-enabled once the library issue is resolved or a workaround is found.
 
 ## 🚧 Next Steps
 
@@ -88,6 +95,7 @@ src/
 - Deploy contract to Conway Testnet
 - Connect frontend to contract for on-chain betting
 - Implement transaction signing with Linera client
+- Re-enable balance display (once validator URL issue is resolved)
 
 ## 🔗 Resources
 
