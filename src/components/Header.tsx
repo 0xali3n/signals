@@ -7,6 +7,7 @@ import { exportWallet } from '../utils/wallet';
 export function Header() {
   const { wallet, username, deleteWallet } = useWalletStore();
   const [showMenu, setShowMenu] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   const handleDisconnect = () => {
     if (confirm('Are you sure you want to disconnect? You can import your wallet later.')) {
@@ -19,6 +20,13 @@ export function Header() {
     if (!wallet) return;
 
     try {
+      // Log what we're exporting
+      console.log('Exporting wallet:', {
+        address: wallet.address,
+        hasChainId: !!wallet.chainId,
+        chainId: wallet.chainId,
+      });
+      
       const exported = await exportWallet(wallet, '');
       const blob = new Blob([exported], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -28,7 +36,10 @@ export function Header() {
       a.click();
       URL.revokeObjectURL(url);
       setShowMenu(false);
+      
+      console.log('✅ Wallet exported successfully with all data');
     } catch (err) {
+      console.error('Export error:', err);
       alert('Failed to export wallet');
     }
   };
@@ -58,15 +69,60 @@ export function Header() {
                   <p className="text-sm font-medium text-slate-800 mb-0.5">{username}</p>
                 )}
                 <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
+                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
                   <p className="text-xs font-mono text-slate-600">
                     {wallet.address.slice(0, 8)}...{wallet.address.slice(-6)}
                   </p>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5 font-medium">
                   {wallet.balance.toLocaleString()} tokens
+                  {wallet.balance === 0 && (
+                    <span className="ml-1 text-amber-600" title="Balance fetch disabled to prevent crashes">
+                      (estimated)
+                    </span>
+                  )}
                 </p>
+                {wallet.chainId && (
+                  <button
+                    onClick={() => setShowDetails(!showDetails)}
+                    className="text-xs text-amber-600 hover:text-amber-700 mt-1 underline"
+                  >
+                    {showDetails ? 'Hide' : 'View'} Details
+                  </button>
+                )}
               </div>
+              
+              {showDetails && wallet.chainId && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg border border-amber-200/60 z-30 shadow-lg p-4">
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Wallet Address</p>
+                      <p className="text-xs font-mono text-slate-700 break-all">{wallet.address}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Microchain ID</p>
+                      <p className="text-xs font-mono text-slate-700 break-all">{wallet.chainId}</p>
+                      <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        Chain claimed from faucet
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500 mb-1">Balance</p>
+                      <p className="text-sm font-semibold text-slate-800">
+                        {wallet.balance.toLocaleString()} tokens
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-amber-200/50">
+                      <p className="text-xs text-slate-500">
+                        Network: Conway Testnet
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               <div className="relative">
                 <button

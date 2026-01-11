@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { useWalletStore } from '../store/walletStore';
 import { importWallet } from '../utils/wallet';
 import { WalletCreated } from './WalletCreated';
+import { WalletCreationProgress } from './WalletCreationProgress';
 
 export function WalletSetup() {
-  const { wallet, createWallet, setWallet } = useWalletStore();
+  const { wallet, createWallet, setWallet, creationStep, creationMessage } = useWalletStore();
   const [showImport, setShowImport] = useState(false);
   const [showCreated, setShowCreated] = useState(false);
   const [importData, setImportData] = useState('');
@@ -20,6 +21,8 @@ export function WalletSetup() {
       setError(null);
       setIsCreating(true);
       await createWallet();
+      // Wait a moment to show completion
+      await new Promise(resolve => setTimeout(resolve, 500));
       setShowCreated(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create wallet');
@@ -76,16 +79,43 @@ export function WalletSetup() {
         throw new Error('Invalid wallet format');
       }
 
+      // Log import details for verification
+      console.log('Importing wallet:', {
+        address: importedWallet.address,
+        hasChainId: !!importedWallet.chainId,
+        chainId: importedWallet.chainId,
+        balance: importedWallet.balance,
+      });
+
       // Save and connect wallet
       await setWallet(importedWallet);
+      
+      // If chainId exists, wallet is fully restored
+      if (importedWallet.chainId) {
+        console.log('✅ Wallet fully restored with microchain ID');
+      } else {
+        console.warn('⚠️ Wallet imported but no chainId found - user may need to claim chain again');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to import wallet. Please check your file and try again.');
       setIsImporting(false);
     }
   };
 
-  if (wallet && !showCreated) {
+  if (wallet && !showCreated && creationStep === 'idle') {
     return null; // Wallet is connected, header will show it
+  }
+
+  // Show creation progress
+  if (creationStep !== 'idle' && creationStep !== 'complete') {
+    return (
+      <WalletCreationProgress
+        step={creationStep}
+        message={creationMessage || undefined}
+        address={wallet?.address}
+        chainId={wallet?.chainId}
+      />
+    );
   }
 
   if (showCreated && wallet) {

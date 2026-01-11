@@ -8,14 +8,15 @@ import { MarketView } from './components/MarketView';
 import { BettingPanel } from './components/BettingPanel';
 
 function App() {
-  const { wallet, isLoading, initialize } = useWalletStore();
+  const { wallet, isLoading, initialize, creationStep } = useWalletStore();
   const { marketState } = useMarket();
 
   useEffect(() => {
     initialize();
   }, [initialize]);
 
-  if (isLoading) {
+  // Show loading only during initial app load, not during wallet creation
+  if (isLoading && creationStep === 'idle' && !wallet) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -31,7 +32,7 @@ function App() {
       <Header />
       
       <div className="container mx-auto px-4 py-8 max-w-6xl">
-        {!wallet ? (
+        {!wallet || (creationStep !== 'idle' && creationStep !== 'complete') ? (
           <div className="flex items-center justify-center min-h-[calc(100vh-120px)]">
             <WalletSetup />
           </div>

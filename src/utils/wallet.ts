@@ -2,6 +2,7 @@
 
 import { signer } from '@linera/client';
 import { Wallet } from '../types';
+import { createWalletFromFaucet, claimChainFromFaucet } from './lineraClient';
 
 const { PrivateKey } = signer;
 
@@ -25,6 +26,46 @@ export async function generateKeypair(): Promise<{ address: string; privateKey: 
   } catch (error) {
     console.error('Failed to generate keypair:', error);
     throw new Error('Failed to generate wallet keypair');
+  }
+}
+
+/**
+ * Create wallet and claim chain from faucet (gets test tokens automatically)
+ * @param lineraWallet - Optional Linera Wallet instance to reuse (if already created)
+ */
+export async function createWalletWithFaucet(lineraWallet?: any): Promise<{ address: string; privateKey: string; chainId: string; lineraWallet: any }> {
+  try {
+    // Step 1: Generate keypair
+    const { address, privateKey } = await generateKeypair();
+    
+    // Step 2: Create Linera wallet from faucet (or reuse provided one)
+    let walletInstance = lineraWallet;
+    if (!walletInstance) {
+      console.log('Creating wallet from faucet...');
+      walletInstance = await createWalletFromFaucet();
+    }
+    
+    // Step 3: Claim chain from faucet with test tokens
+    console.log('Claiming chain from faucet...');
+    const chainId = await claimChainFromFaucet(walletInstance, address);
+    
+    console.log('Wallet created successfully, chainId:', chainId);
+    return { address, privateKey, chainId, lineraWallet: walletInstance };
+  } catch (error) {
+    console.error('Failed to create wallet with faucet:', error);
+    
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('fetch') || error.message.includes('network')) {
+        throw new Error('Network error: Could not connect to Conway testnet faucet. Please check your internet connection.');
+      }
+      if (error.message.includes('ERR_NAME_NOT_RESOLVED')) {
+        throw new Error('Faucet URL not found. The Conway testnet may be temporarily unavailable.');
+      }
+      throw new Error(`Failed to create wallet: ${error.message}`);
+    }
+    
+    throw new Error('Failed to create wallet and claim chain from faucet. Please try again.');
   }
 }
 
@@ -58,20 +99,31 @@ export async function saveWallet(wallet: Wallet): Promise<void> {
 
 /**
  * Export wallet as encrypted JSON
+ * Includes: address, privateKey, chainId, balance
  */
 export async function exportWallet(wallet: Wallet, _password: string): Promise<string> {
+  // Export all wallet data including chainId
+  const walletData = {
+    address: wallet.address,
+    privateKey: wallet.privateKey,
+    chainId: wallet.chainId, // IMPORTANT: Include microchain ID
+    balance: wallet.balance,
+  };
+  
   // TODO: Implement proper encryption
   // For MVP, we'll use a simple encoding (NOT secure for production)
-  const encrypted = btoa(JSON.stringify(wallet));
+  const encrypted = btoa(JSON.stringify(walletData));
   return JSON.stringify({
     version: '1.0',
     encrypted,
     timestamp: Date.now(),
+    network: 'Conway Testnet', // Include network info
   });
 }
 
 /**
  * Import wallet from encrypted JSON and verify using Linera client
+ * Restores: address, privateKey, chainId, balance
  */
 export async function importWallet(exportedData: string, _password: string): Promise<Wallet> {
   try {
@@ -93,12 +145,21 @@ export async function importWallet(exportedData: string, _password: string): Pro
         throw new Error('Wallet verification failed: address mismatch');
       }
       
-      // Return verified wallet
-      return {
+      // Return verified wallet with ALL data including chainId
+      const importedWallet: Wallet = {
         address: derivedAddress,
         privateKey: decrypted.privateKey,
         balance: decrypted.balance || 0,
+        chainId: decrypted.chainId, // IMPORTANT: Preserve microchain ID
       };
+      
+      console.log('Wallet imported successfully:', {
+        address: importedWallet.address,
+        hasChainId: !!importedWallet.chainId,
+        chainId: importedWallet.chainId,
+      });
+      
+      return importedWallet;
     } catch (verifyError) {
       console.error('Wallet verification error:', verifyError);
       throw new Error('Invalid private key or wallet format');

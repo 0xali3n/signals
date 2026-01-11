@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Market, Bet, BetDirection, MarketState } from '../types';
 // import { callApplication } from '../utils/linera'; // TODO: Implement Linera integration
-import { useWallet } from './useWallet';
+import { useWalletStore } from '../store/walletStore';
 
 const MOCK_MARKET: Market = {
   id: 'market-1',
@@ -16,7 +16,7 @@ const MOCK_MARKET: Market = {
 };
 
 export function useMarket() {
-  const { wallet } = useWallet();
+  const { wallet } = useWalletStore();
   const [market, setMarket] = useState<Market>(MOCK_MARKET);
   const [userBet, setUserBet] = useState<Bet | null>(null);
   const [isLoading, setIsLoading] = useState(false);

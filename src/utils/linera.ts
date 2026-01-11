@@ -1,4 +1,4 @@
-// Linera Web Client integration utilities
+// Linera Web Client integration utilities (legacy - use lineraClient.ts)
 
 import { initialize } from '@linera/client';
 import type { Client } from '@linera/client';
@@ -7,6 +7,7 @@ let isInitialized = false;
 
 /**
  * Initialize Linera Web Client connection to Conway Testnet
+ * @deprecated Use initLineraClient from lineraClient.ts
  */
 export async function initLineraClient() {
   if (!isInitialized) {
@@ -24,6 +25,7 @@ export async function initLineraClient() {
 
 /**
  * Create a Linera client instance from a private key
+ * @deprecated Use createClient from lineraClient.ts
  */
 export async function createClientFromPrivateKey(_privateKey: string): Promise<Client> {
   await initLineraClient();

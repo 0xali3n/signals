@@ -26,6 +26,8 @@ export interface Wallet {
   address: string;
   privateKey: string; // Encrypted in storage
   balance: number;
+  chainId?: string; // Linera microchain ID
+  lineraWallet?: any; // Linera Wallet instance (not serialized)
 }
 
 export interface MarketState {
