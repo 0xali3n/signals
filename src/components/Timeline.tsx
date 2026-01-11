@@ -53,9 +53,9 @@ export function Timeline({ currentTime }: TimelineProps) {
     // Round to nearest 10 seconds for stable marker generation
     const baseTime = Math.floor(currentTime / 10000) * 10000;
     
-    // Generate markers for a wider range (3 minutes total) to ensure smooth scrolling
-    // This gives us buffer markers that scroll in/out smoothly
-    for (let offset = -180; offset <= 180; offset += 10) {
+    // Generate markers for a wider range (4 minutes each side = 8 minutes total) to ensure smooth scrolling
+    // This gives us buffer markers that scroll in/out smoothly and extends fully to edges
+    for (let offset = -240; offset <= 240; offset += 10) {
       const timestamp = baseTime + offset * 1000;
       markers.push({
         id: `marker-${timestamp}`,
@@ -68,8 +68,8 @@ export function Timeline({ currentTime }: TimelineProps) {
   }, [Math.floor(currentTime / 10000)]); // Only regenerate when we cross a 10-second boundary
 
   // Calculate position for each marker based on actual time difference
-  // Timeline scrolls: past times on left, future times on right, current time at center
-  // Position formula: 50% + (timeDiff / 240s) × 50%
+  // Timeline scrolls: past times on left, future times on right, current time at 30% (moved left)
+  // Position formula: 30% + (timeDiff / 240s) × 70% (to use 70% of space on right)
 
   // Calculate positions for all markers - no filtering, all markers shown
   // This ensures consistent spacing and sizing without position jumps
@@ -78,11 +78,12 @@ export function Timeline({ currentTime }: TimelineProps) {
       .map((marker) => {
         const timeDiff = (marker.timestamp - currentTime) / 1000;
         const timeWindow = 240;
-        const position = 50 + (timeDiff / timeWindow) * 50;
+        // Center at 30%, use 70% of space on right side, extend fully to edges
+        const position = 30 + (timeDiff / timeWindow) * 70;
         return { marker, position };
       })
-      .filter(({ position }) => position >= -5 && position <= 105);
-  }, [timelineMarkers, Math.floor(currentTime / 100)]); // Update every 100ms for smoother scrolling
+      .filter(({ position }) => position >= -10 && position <= 110); // Extended range to show full timeline to edges
+  }, [timelineMarkers, Math.floor(currentTime / 100)]); // Update every 100ms for smooth animation with second-by-second accuracy
 
   return (
     <div className="absolute bottom-0 left-0 right-0 h-36 border-t border-orange-500/30 bg-gradient-to-t from-black/95 via-black/80 to-black/40 overflow-hidden">
@@ -148,13 +149,13 @@ export function Timeline({ currentTime }: TimelineProps) {
                       : "bg-orange-500/45"
                   } transition-all duration-75`}
                 />
-                {/* Time label with premium styling - always show */}
+                {/* Time label with premium styling - always show, no orange box for current time */}
                 <div
                   className={`mt-4 font-mono whitespace-nowrap z-20 tracking-wide ${
                     isMinuteMarker
                       ? "text-[9px] text-orange-400/96 font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
                       : isNow
-                      ? "text-[10px] text-orange-400 font-bold bg-black/96 px-2.5 py-1.5 rounded-md border border-orange-400/40 shadow-[0_0_10px_rgba(251,146,60,0.4)] backdrop-blur-sm"
+                      ? "text-[10px] text-orange-400 font-bold drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
                       : isPast
                       ? "text-[8px] text-orange-400/85 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
                       : "text-[8px] text-orange-400/75 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]"
@@ -167,17 +168,16 @@ export function Timeline({ currentTime }: TimelineProps) {
           })}
         </div>
 
-        {/* NOW indicator - aligned with red dashed line position (canvas center - 5%) */}
+        {/* NOW indicator - aligned with center line position (30% from left) - no vertical line, just labels */}
         <div 
-          className="absolute top-0 h-full flex flex-col items-center justify-between z-30 pointer-events-none pb-2"
+          className="absolute top-0 h-full flex flex-col items-center justify-end z-30 pointer-events-none pb-2"
           style={{
-            // Matches canvas centerX: 7rem (price scale) + 45% of canvas width
-            // Canvas width = 100% - 7rem, centerX = (100% - 7rem) * 0.45
-            left: 'calc(7rem + (100% - 7rem) * 0.45)',
+            // Matches canvas centerX: 7rem (price scale) + 30% of canvas width
+            // Canvas width = 100% - 7rem, centerX = (100% - 7rem) * 0.30
+            left: 'calc(7rem + (100% - 7rem) * 0.30)',
             transform: 'translateX(-50%)'
           }}
         >
-          <div className="flex-1 w-[2px] bg-orange-400 shadow-[0_0_16px_rgba(251,146,60,0.9)]" />
           <div className="mt-2.5 text-[10px] font-mono text-orange-400 font-bold bg-black/97 px-3 py-1.5 rounded-lg border border-orange-400/50 shadow-[0_0_16px_rgba(251,146,60,0.5)] whitespace-nowrap backdrop-blur-sm">
             NOW
           </div>

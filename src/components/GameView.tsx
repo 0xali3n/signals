@@ -32,8 +32,22 @@ export function GameView({ market, userBet }: GameViewProps) {
   const animationRef = useRef<number>();
   const [betAmount, setBetAmount] = useState("10");
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const [liveTime, setLiveTime] = useState(() => {
+    const now = new Date();
+    return now.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+  });
   const { wallet } = useWalletStore();
   const { placeBet, claimReward, isLoading } = useMarket();
+
+  // Animation state for floating/bouncing effects
+  const animationTimeRef = useRef<number>(0);
+  const previousPriceRef = useRef<number>(currentPrice);
+  const priceChangeAnimationRef = useRef<number>(0);
 
   // Subscribe to real-time BTC price - continuous updates with memory management
   useEffect(() => {
@@ -79,11 +93,35 @@ export function GameView({ market, userBet }: GameViewProps) {
     };
   }, []);
 
+  // Update live time display every second with real system time (matching Timeline component)
+  useEffect(() => {
+    // Update immediately on mount
+    const updateTime = () => {
+      const now = new Date(); // Fetches time from user's local system
+      setLiveTime(
+        now.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        })
+      );
+    };
+
+    // Update immediately
+    updateTime();
+
+    // Then update every second
+    const interval = setInterval(updateTime, 1000);
+
+    return () => clearInterval(interval);
+  }, []); // Empty deps - runs once on mount
+
   // Calculate price scale when price history or current price changes
   // Always centers around current price with reasonable zoom to show movements clearly
   useEffect(() => {
     const now = Date.now();
-    const timeWindow = 2 * 60 * 1000; // 2 minutes
+    const timeWindow = 240 * 1000; // 4 minutes (matching timeline and price line)
     const windowStart = now - timeWindow;
 
     // Filter to only prices within the visible time window
@@ -143,6 +181,22 @@ export function GameView({ market, userBet }: GameViewProps) {
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // Update animation time for floating effect (continuous)
+      animationTimeRef.current += 0.016; // ~60fps
+
+      // Detect price change and trigger wave animation
+      if (Math.abs(currentPrice - previousPriceRef.current) > 0.01) {
+        priceChangeAnimationRef.current = 0;
+        previousPriceRef.current = currentPrice;
+      }
+
+      // Update price change animation (wave effect when price changes)
+      if (priceChangeAnimationRef.current < 1) {
+        priceChangeAnimationRef.current += 0.05; // Smooth wave transition
+        if (priceChangeAnimationRef.current > 1)
+          priceChangeAnimationRef.current = 1;
+      }
+
       // Draw grid lines - 15 sections for better spacing
       ctx.strokeStyle = "rgba(251, 146, 60, 0.08)";
       ctx.lineWidth = 1;
@@ -154,16 +208,10 @@ export function GameView({ market, userBet }: GameViewProps) {
         ctx.stroke();
       }
 
-      // Draw center vertical line - slightly offset to the left
-      const centerX = canvas.width / 2 - canvas.width * 0.05; // 5% offset to the left
-      ctx.strokeStyle = "rgba(251, 146, 60, 0.3)";
-      ctx.lineWidth = 2;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.moveTo(centerX, 0);
-      ctx.lineTo(centerX, canvas.height);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      // Center X position - positioned at 30% from left to leave 70% space on right
+      const centerX = canvas.width * 0.23; // 30% from left
+      // Price line X position - 22% from left (moved 3% to the left from 25%)
+      const priceLineX = canvas.width * 0.23; // 22% from left
 
       // Calculate price scale for canvas drawing - match the $10 increment scale
       const roundedCurrentPrice = Math.round(currentPrice / 10) * 10;
@@ -173,8 +221,26 @@ export function GameView({ market, userBet }: GameViewProps) {
       const canvasPriceRange = canvasMaxPrice - canvasMinPrice;
 
       const now = currentTime;
-      const timeWindow = 2 * 60 * 1000;
+      const timeWindow = 240 * 1000; // 4 minutes in milliseconds (matching timeline)
       const startTime = now - timeWindow;
+
+      // Floating/bouncing animation values (continuous small movement)
+      const floatOffset = Math.sin(animationTimeRef.current * 2) * 1.5; // Small vertical bounce
+      const floatOffsetX = Math.cos(animationTimeRef.current * 1.5) * 0.8; // Small horizontal drift
+
+      // Wave animation when price changes (smooth wave transition)
+      const waveOffset =
+        priceChangeAnimationRef.current < 1
+          ? Math.sin(priceChangeAnimationRef.current * Math.PI * 2) *
+            3 *
+            (1 - priceChangeAnimationRef.current)
+          : 0;
+
+      // Calculate current price Y position with floating animation
+      const baseY =
+        canvas.height -
+        ((currentPrice - canvasMinPrice) / canvasPriceRange) * canvas.height;
+      const currentY = baseY + floatOffset + waveOffset;
 
       // Draw price line if we have history
       if (priceHistory.length > 0) {
@@ -182,64 +248,166 @@ export function GameView({ market, userBet }: GameViewProps) {
           .filter((p) => p.timestamp >= startTime)
           .sort((a, b) => a.timestamp - b.timestamp);
 
-        if (pointsToDraw.length > 1) {
+        if (pointsToDraw.length > 0) {
+          // Calculate wave animation for the entire line
+          const lineWavePhase = animationTimeRef.current * 0.8; // Slower wave for line
+          const lineWaveAmplitude = 1.2; // Small wave amplitude
+
+          // Draw thick yellow price line (horizontal price history) starting from first historical point
           ctx.strokeStyle = "#F4C430";
           ctx.lineWidth = 2;
           ctx.shadowBlur = 4;
           ctx.shadowColor = "rgba(244, 196, 48, 0.4)";
           ctx.beginPath();
 
+          // Start from first historical point instead of current price dot
+          const firstPoint = pointsToDraw[0];
+          const firstTimeDiff = (firstPoint.timestamp - now) / 1000;
+          const firstX =
+            priceLineX +
+            (firstTimeDiff / 240) * (canvas.width - priceLineX) +
+            floatOffsetX;
+          const firstBaseY =
+            canvas.height -
+            ((firstPoint.price - canvasMinPrice) / canvasPriceRange) *
+              canvas.height;
+          // Add floating wave to first point
+          const firstWave = Math.sin(lineWavePhase) * lineWaveAmplitude;
+          const firstY = firstBaseY + firstWave;
+          ctx.moveTo(firstX, firstY);
+
+          // Draw from first point onwards with wave animation
           pointsToDraw.forEach((point, index) => {
-            const timeOffset = point.timestamp - now;
-            const timeRatio = Math.max(
-              0,
-              Math.min(1, (timeOffset + timeWindow) / timeWindow)
-            );
-            const x = timeRatio * centerX;
-            const y =
+            // Calculate time difference in seconds (matching timeline calculation exactly)
+            const timeDiff = (point.timestamp - now) / 1000;
+            // Map time to x position: when timeDiff = 0, x = priceLineX (20% of canvas)
+            // When timeDiff = -240: x = 0 (left edge)
+            // When timeDiff = +240: x = canvas.width (right edge)
+            const baseX =
+              priceLineX + (timeDiff / 240) * (canvas.width - priceLineX);
+            const x = baseX + floatOffsetX * (1 - Math.abs(timeDiff) / 240); // Less drift at edges
+
+            const baseY =
               canvas.height -
               ((point.price - canvasMinPrice) / canvasPriceRange) *
                 canvas.height;
 
+            // Add wave animation that flows along the line
+            const waveProgress = index / Math.max(pointsToDraw.length - 1, 1);
+            const wavePhase = lineWavePhase + waveProgress * 2;
+            const wave = Math.sin(wavePhase) * lineWaveAmplitude;
+            const y = baseY + wave;
+
             if (index === 0) {
-              ctx.moveTo(x, y);
+              // Already moved to first point, just continue
+              // No need to draw curve from starting dot
             } else {
               const prevPoint = pointsToDraw[index - 1];
-              const prevTimeOffset = prevPoint.timestamp - now;
-              const prevTimeRatio = Math.max(
-                0,
-                Math.min(1, (prevTimeOffset + timeWindow) / timeWindow)
-              );
-              const prevX = prevTimeRatio * centerX;
-              const prevY =
+              const prevTimeDiff = (prevPoint.timestamp - now) / 1000;
+              const prevBaseX =
+                priceLineX + (prevTimeDiff / 240) * (canvas.width - priceLineX);
+              const prevX =
+                prevBaseX + floatOffsetX * (1 - Math.abs(prevTimeDiff) / 240);
+
+              const prevBaseY =
                 canvas.height -
                 ((prevPoint.price - canvasMinPrice) / canvasPriceRange) *
                   canvas.height;
+              const prevWaveProgress =
+                (index - 1) / Math.max(pointsToDraw.length - 1, 1);
+              const prevWavePhase = lineWavePhase + prevWaveProgress * 2;
+              const prevWave = Math.sin(prevWavePhase) * lineWaveAmplitude;
+              const prevY = prevBaseY + prevWave;
+
               const controlX = (prevX + x) / 2;
               const controlY = (prevY + y) / 2;
               ctx.quadraticCurveTo(controlX, controlY, x, y);
             }
           });
           ctx.stroke();
+          ctx.setLineDash([]); // Reset dash pattern
+
+          // Draw yellow dot at starting point (current price position) with floating animation
+          const startDotX = priceLineX + floatOffsetX;
+          const startDotY = currentY;
+          ctx.fillStyle = "#F4C430";
+          ctx.shadowBlur = 10 + Math.sin(animationTimeRef.current * 3) * 2; // Pulsing glow
+          ctx.shadowColor = "rgba(244, 196, 48, 0.7)";
+          ctx.beginPath();
+          ctx.arc(
+            startDotX,
+            startDotY,
+            5 + Math.sin(animationTimeRef.current * 4) * 0.5,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          // Draw yellow dot at tail edge (leftmost/oldest point) with floating animation
+          const tailPoint = pointsToDraw[0]; // First point is the oldest (tail edge)
+          const tailTimeDiff = (tailPoint.timestamp - now) / 1000;
+          const tailBaseX =
+            priceLineX + (tailTimeDiff / 240) * (canvas.width - priceLineX);
+          const tailX =
+            tailBaseX + floatOffsetX * (1 - Math.abs(tailTimeDiff) / 240);
+
+          const tailBaseY =
+            canvas.height -
+            ((tailPoint.price - canvasMinPrice) / canvasPriceRange) *
+              canvas.height;
+          const tailWave = Math.sin(lineWavePhase) * lineWaveAmplitude;
+          const tailY = tailBaseY + tailWave;
+
+          ctx.fillStyle = "#F4C430";
+          ctx.shadowBlur = 8 + Math.sin(animationTimeRef.current * 2.5) * 1.5;
+          ctx.shadowColor = "rgba(244, 196, 48, 0.6)";
+          ctx.beginPath();
+          ctx.arc(
+            tailX,
+            tailY,
+            5 + Math.sin(animationTimeRef.current * 3.5) * 0.4,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+          ctx.shadowBlur = 0;
         }
 
-        // Draw current price indicator
-        const currentY =
-          canvas.height -
-          ((currentPrice - canvasMinPrice) / canvasPriceRange) * canvas.height;
-        ctx.fillStyle = "#F4C430";
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = "rgba(244, 196, 48, 0.6)";
+        // Draw vertical reference line from top to bottom at price position - premium dotted orange with subtle float
+        const referenceLineX = priceLineX + floatOffsetX * 0.3; // Subtle horizontal drift
+        ctx.strokeStyle = "rgba(251, 146, 60, 0.4)"; // Subtle orange
+        ctx.lineWidth = 1; // Thin line
+        ctx.setLineDash([3, 3]); // Dotted pattern
         ctx.beginPath();
-        ctx.arc(centerX, currentY, 5, 0, Math.PI * 2);
+        ctx.moveTo(referenceLineX, 0);
+        ctx.lineTo(referenceLineX, canvas.height);
+        ctx.stroke();
+        ctx.setLineDash([]); // Reset dash pattern
+
+        // Draw current price indicator with floating animation
+        const indicatorX = centerX + floatOffsetX;
+        const indicatorY = currentY;
+
+        // Pulsing glow effect
+        const pulseGlow = 8 + Math.sin(animationTimeRef.current * 3.5) * 3;
+        const pulseSize = 5 + Math.sin(animationTimeRef.current * 4) * 0.6;
+
+        ctx.fillStyle = "#F4C430";
+        ctx.shadowBlur = pulseGlow;
+        ctx.shadowColor = "rgba(244, 196, 48, 0.7)";
+        ctx.beginPath();
+        ctx.arc(indicatorX, indicatorY, pulseSize, 0, Math.PI * 2);
         ctx.fill();
 
+        // Horizontal line with slight wave
+        const lineWave = Math.sin(animationTimeRef.current * 2.5) * 0.5;
         ctx.strokeStyle = "#F4C430";
         ctx.lineWidth = 1;
         ctx.shadowBlur = 2;
         ctx.beginPath();
-        ctx.moveTo(centerX - 15, currentY);
-        ctx.lineTo(centerX + 15, currentY);
+        ctx.moveTo(indicatorX - 15, indicatorY + lineWave);
+        ctx.lineTo(indicatorX + 15, indicatorY + lineWave);
         ctx.stroke();
       }
 
@@ -318,6 +486,18 @@ export function GameView({ market, userBet }: GameViewProps) {
           className="w-full h-full"
           style={{ imageRendering: "crisp-edges" }}
         />
+        {/* Live time box at price line intersection with timeline */}
+        <div
+          className="absolute bottom-0 z-30"
+          style={{
+            left: "23%",
+            transform: "translateX(-50%)",
+          }}
+        >
+          <div className="text-[9px] font-mono text-orange-400 font-bold bg-black/95 px-2 py-1 rounded border border-orange-400/50 shadow-[0_0_8px_rgba(251,146,60,0.4)] backdrop-blur-sm whitespace-nowrap">
+            {liveTime}
+          </div>
+        </div>
       </div>
 
       {/* Timeline component */}
