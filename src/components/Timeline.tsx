@@ -13,26 +13,31 @@ interface TimelineMarker {
 
 export function Timeline({ currentTime }: TimelineProps) {
   // Stable time display to prevent blinking - update only once per second
+  // Time is fetched from browser's local system time (user's timezone)
+  // Uses JavaScript Date object which gets time from user's device
   const [displayTime, setDisplayTime] = useState(() => {
-    const now = new Date();
+    const now = new Date(); // Gets current time from user's browser/system
+    // toLocaleTimeString uses browser's local timezone automatically
     return now.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
       hour12: false,
+      // timeZone: 'UTC' // Uncomment to force UTC timezone
     });
   });
 
   useEffect(() => {
     // Update display time independently, not tied to currentTime prop
     const interval = setInterval(() => {
-      const now = new Date();
+      const now = new Date(); // Fetches time from user's local system
       setDisplayTime(
         now.toLocaleTimeString("en-US", {
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",
           hour12: false,
+          // timeZone: 'UTC' // Uncomment to force UTC timezone
         })
       );
     }, 1000); // Update once per second to prevent blinking
@@ -162,8 +167,16 @@ export function Timeline({ currentTime }: TimelineProps) {
           })}
         </div>
 
-        {/* NOW indicator - fixed at center, always visible with premium styling */}
-        <div className="absolute top-0 left-1/2 h-full flex flex-col items-center justify-between -translate-x-1/2 z-30 pointer-events-none pb-2">
+        {/* NOW indicator - aligned with red dashed line position (canvas center - 5%) */}
+        <div 
+          className="absolute top-0 h-full flex flex-col items-center justify-between z-30 pointer-events-none pb-2"
+          style={{
+            // Matches canvas centerX: 7rem (price scale) + 45% of canvas width
+            // Canvas width = 100% - 7rem, centerX = (100% - 7rem) * 0.45
+            left: 'calc(7rem + (100% - 7rem) * 0.45)',
+            transform: 'translateX(-50%)'
+          }}
+        >
           <div className="flex-1 w-[2px] bg-orange-400 shadow-[0_0_16px_rgba(251,146,60,0.9)]" />
           <div className="mt-2.5 text-[10px] font-mono text-orange-400 font-bold bg-black/97 px-3 py-1.5 rounded-lg border border-orange-400/50 shadow-[0_0_16px_rgba(251,146,60,0.5)] whitespace-nowrap backdrop-blur-sm">
             NOW

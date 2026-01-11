@@ -143,19 +143,19 @@ export function GameView({ market, userBet }: GameViewProps) {
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw grid lines
+      // Draw grid lines - 15 sections for better spacing
       ctx.strokeStyle = "rgba(251, 146, 60, 0.08)";
       ctx.lineWidth = 1;
-      for (let i = 0; i <= 20; i++) {
-        const y = (canvas.height / 20) * i;
+      for (let i = 0; i <= 15; i++) {
+        const y = (canvas.height / 15) * i;
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(canvas.width, y);
         ctx.stroke();
       }
 
-      // Draw center vertical line
-      const centerX = canvas.width / 2;
+      // Draw center vertical line - slightly offset to the left
+      const centerX = canvas.width / 2 - canvas.width * 0.05; // 5% offset to the left
       ctx.strokeStyle = "rgba(251, 146, 60, 0.3)";
       ctx.lineWidth = 2;
       ctx.setLineDash([4, 4]);
@@ -167,7 +167,7 @@ export function GameView({ market, userBet }: GameViewProps) {
 
       // Calculate price scale for canvas drawing - match the $10 increment scale
       const roundedCurrentPrice = Math.round(currentPrice / 10) * 10;
-      const numIncrements = 10;
+      const numIncrements = 7; // 7 increments above and below = 15 total sections
       const canvasMinPrice = roundedCurrentPrice - numIncrements * 10;
       const canvasMaxPrice = roundedCurrentPrice + numIncrements * 10;
       const canvasPriceRange = canvasMaxPrice - canvasMinPrice;
@@ -282,9 +282,9 @@ export function GameView({ market, userBet }: GameViewProps) {
           // Round current price to nearest multiple of 10
           const roundedCurrentPrice = Math.round(currentPrice / 10) * 10;
 
-          // Calculate how many $10 increments we need (10 increments = $100 range)
+          // Calculate how many $10 increments we need (7 increments = $70 range per side, $140 total)
           // We want to show prices around current price with $10 gaps
-          const numIncrements = 10; // 10 increments above and below = 21 total lines
+          const numIncrements = 7; // 7 increments above and below = 15 total sections
           const startPrice = roundedCurrentPrice - numIncrements * 10;
 
           // Generate prices with $10 gaps, all rounded to nearest 10
@@ -326,7 +326,12 @@ export function GameView({ market, userBet }: GameViewProps) {
       {/* HUD Elements */}
       <div className="absolute top-6 left-28 right-6 flex items-center justify-start z-20">
         <div className="px-4 py-2 bg-black/30 backdrop-blur-sm rounded-lg border border-orange-500/20">
-          <div className="text-xs text-slate-400 mb-1">Current Price</div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="text-xs text-slate-400">Current Price</div>
+            <div className="text-[10px] font-semibold text-orange-400/80 bg-orange-500/20 px-2 py-0.5 rounded">
+              BINANCE
+            </div>
+          </div>
           <div className="text-xl font-mono font-semibold text-orange-400">
             $
             {currentPrice.toLocaleString(undefined, {
