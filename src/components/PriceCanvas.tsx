@@ -78,7 +78,7 @@ export function PriceCanvas({
       }
 
       // Center X position - 30% from left (matches Timeline CURRENT_TIME_POSITION)
-      const priceLineX = canvas.width * 0.30;
+      const priceLineX = canvas.width * 0.3;
 
       // Calculate price scale for canvas drawing
       const roundedCurrentPrice = Math.round(currentPrice / 10) * 10;
@@ -144,7 +144,9 @@ export function PriceCanvas({
 
           const firstPoint = pointsToDraw[0];
           const firstTimeDiff = (firstPoint.timestamp - now) / 1000;
-          // Stable X position - no floatOffsetX
+          // Right-to-left flow: past points (negative timeDiff) go left, future points go right
+          // Current time (0) stays at priceLineX (30% from left)
+          // Older data flows from right (100%) to left (0%), passing through current position
           const firstX =
             priceLineX + (firstTimeDiff / 240) * (canvas.width - priceLineX);
           // Stable Y position - no wave
@@ -155,9 +157,13 @@ export function PriceCanvas({
           ctx.moveTo(firstX, firstY);
 
           // Draw smooth curve through all points - completely stable
+          // Data flows from right to left: newer timestamps appear on right, older on left
           pointsToDraw.forEach((point, index) => {
             const timeDiff = (point.timestamp - now) / 1000;
-            // Stable X position - no animations
+            // Right-to-left positioning:
+            // - Future points (positive timeDiff) appear to the right of current position
+            // - Past points (negative timeDiff) appear to the left of current position
+            // - As time progresses, all points shift left
             const x =
               priceLineX + (timeDiff / 240) * (canvas.width - priceLineX);
 

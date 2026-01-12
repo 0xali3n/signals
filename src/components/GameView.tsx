@@ -98,23 +98,6 @@ export function GameView({ market, userBet }: GameViewProps) {
           currentTime={currentTime}
           priceScale={priceScale}
         />
-        {/* Live time box at price line intersection with timeline */}
-        <div
-          className="absolute bottom-0 z-30"
-          style={{
-            left: "30%",
-            transform: "translateX(-50%)",
-          }}
-        >
-          <div className="text-[9px] font-mono text-orange-400 font-bold bg-black/95 px-2 py-1 rounded whitespace-nowrap">
-            {new Date(currentTime).toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-              hour12: false,
-            })}
-          </div>
-        </div>
       </div>
 
       {/* Timeline component */}
