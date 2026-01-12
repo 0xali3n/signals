@@ -1,5 +1,5 @@
 // Hook for smooth animation frame updates
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
 export function useAnimationFrame(callback: () => void) {
   const requestRef = useRef<number>();
@@ -8,7 +8,6 @@ export function useAnimationFrame(callback: () => void) {
   useEffect(() => {
     const animate = (time: number) => {
       if (previousTimeRef.current !== undefined) {
-        const deltaTime = time - previousTimeRef.current;
         callback();
       }
       previousTimeRef.current = time;
@@ -24,4 +23,3 @@ export function useAnimationFrame(callback: () => void) {
     };
   }, [callback]);
 }
-

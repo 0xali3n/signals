@@ -1,5 +1,5 @@
 // Canvas component for drawing price line
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
 interface PricePoint {
   price: number;
@@ -42,9 +42,9 @@ export function PriceCanvas({
     };
 
     updateCanvasSize();
-    window.addEventListener('resize', updateCanvasSize);
+    window.addEventListener("resize", updateCanvasSize);
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const draw = () => {
@@ -67,7 +67,7 @@ export function PriceCanvas({
       }
 
       // Draw grid lines
-      ctx.strokeStyle = 'rgba(251, 146, 60, 0.08)';
+      ctx.strokeStyle = "rgba(251, 146, 60, 0.08)";
       ctx.lineWidth = 1;
       for (let i = 0; i <= 15; i++) {
         const y = (canvas.height / 15) * i;
@@ -78,7 +78,6 @@ export function PriceCanvas({
       }
 
       // Center X position - 35% from left
-      const centerX = canvas.width * 0.35;
       const priceLineX = canvas.width * 0.35;
 
       // Calculate price scale for canvas drawing
@@ -109,22 +108,24 @@ export function PriceCanvas({
       const baseY =
         canvas.height -
         ((currentPrice - canvasMinPrice) / canvasPriceRange) * canvas.height;
-      
+
       // Target position with animations
       const targetY = baseY + floatOffset + waveOffset;
       const targetX = priceLineX + floatOffsetX;
-      
+
       // Initialize smoothed positions on first frame
       if (smoothedYRef.current === null || smoothedXRef.current === null) {
         smoothedYRef.current = targetY;
         smoothedXRef.current = targetX;
       }
-      
+
       // Smooth interpolation for head point position (reduces jitter)
       const smoothingFactor = 0.2; // Lower = smoother but slower response (0.15-0.25 is good)
-      smoothedYRef.current += (targetY - smoothedYRef.current) * smoothingFactor;
-      smoothedXRef.current += (targetX - smoothedXRef.current) * smoothingFactor;
-      
+      smoothedYRef.current +=
+        (targetY - smoothedYRef.current) * smoothingFactor;
+      smoothedXRef.current +=
+        (targetX - smoothedXRef.current) * smoothingFactor;
+
       const currentY = smoothedYRef.current;
 
       // Draw price line if we have history
@@ -135,18 +136,17 @@ export function PriceCanvas({
 
         if (pointsToDraw.length > 0) {
           // Draw price line - STABLE, no wave or shake animations
-          ctx.strokeStyle = '#F4C430';
+          ctx.strokeStyle = "#F4C430";
           ctx.lineWidth = 2;
           ctx.shadowBlur = 4;
-          ctx.shadowColor = 'rgba(244, 196, 48, 0.4)';
+          ctx.shadowColor = "rgba(244, 196, 48, 0.4)";
           ctx.beginPath();
 
           const firstPoint = pointsToDraw[0];
           const firstTimeDiff = (firstPoint.timestamp - now) / 1000;
           // Stable X position - no floatOffsetX
           const firstX =
-            priceLineX +
-            (firstTimeDiff / 240) * (canvas.width - priceLineX);
+            priceLineX + (firstTimeDiff / 240) * (canvas.width - priceLineX);
           // Stable Y position - no wave
           const firstY =
             canvas.height -
@@ -190,26 +190,20 @@ export function PriceCanvas({
           // Draw yellow dot at starting point (head point) - smooth animations
           const startDotX = smoothedXRef.current;
           const startDotY = currentY;
-          
+
           // Smooth pulsing glow - slower and gentler
           const glowPulse = Math.sin(animationTimeRef.current * 1.2) * 1.5; // Reduced from 3*2 to 1.2*1.5
           const shadowBlur = 8 + glowPulse; // Reduced base from 10 to 8
-          
+
           // Smooth size pulse - slower and smaller
           const sizePulse = Math.sin(animationTimeRef.current * 1.5) * 0.3; // Reduced from 4*0.5 to 1.5*0.3
           const dotSize = 5 + sizePulse;
-          
-          ctx.fillStyle = '#F4C430';
+
+          ctx.fillStyle = "#F4C430";
           ctx.shadowBlur = shadowBlur;
-          ctx.shadowColor = 'rgba(244, 196, 48, 0.7)';
+          ctx.shadowColor = "rgba(244, 196, 48, 0.7)";
           ctx.beginPath();
-          ctx.arc(
-            startDotX,
-            startDotY,
-            dotSize,
-            0,
-            Math.PI * 2
-          );
+          ctx.arc(startDotX, startDotY, dotSize, 0, Math.PI * 2);
           ctx.fill();
           ctx.shadowBlur = 0;
 
@@ -225,9 +219,9 @@ export function PriceCanvas({
               canvas.height;
 
           // Static tail dot - no pulsing
-          ctx.fillStyle = '#F4C430';
+          ctx.fillStyle = "#F4C430";
           ctx.shadowBlur = 6;
-          ctx.shadowColor = 'rgba(244, 196, 48, 0.6)';
+          ctx.shadowColor = "rgba(244, 196, 48, 0.6)";
           ctx.beginPath();
           ctx.arc(
             tailX,
@@ -252,24 +246,24 @@ export function PriceCanvas({
         const leftLineX = Math.min(referenceLineX, oneMinuteLineX);
         const rightLineX = Math.max(referenceLineX, oneMinuteLineX);
         const fillWidth = rightLineX - leftLineX;
-        ctx.fillStyle = 'rgba(255, 165, 0, 0.05)';
+        ctx.fillStyle = "rgba(255, 165, 0, 0.05)";
         ctx.fillRect(leftLineX, 0, fillWidth, canvas.height);
 
         // Draw "no bets allowed" text
         const textX = leftLineX + fillWidth / 2;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
         ctx.lineWidth = 3;
-        ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
-        ctx.strokeText('no bets allowed', textX, 12);
-        ctx.fillStyle = 'rgba(255, 165, 0, 0.95)';
-        ctx.fillText('no bets allowed', textX, 12);
-        ctx.textAlign = 'start';
-        ctx.textBaseline = 'alphabetic';
+        ctx.font = "bold 13px system-ui, -apple-system, sans-serif";
+        ctx.strokeText("no bets allowed", textX, 12);
+        ctx.fillStyle = "rgba(255, 165, 0, 0.95)";
+        ctx.fillText("no bets allowed", textX, 12);
+        ctx.textAlign = "start";
+        ctx.textBaseline = "alphabetic";
 
         // Draw first vertical reference line
-        ctx.strokeStyle = 'rgba(251, 146, 60, 0.4)';
+        ctx.strokeStyle = "rgba(251, 146, 60, 0.4)";
         ctx.lineWidth = 2.5;
         ctx.setLineDash([3, 3]);
         ctx.beginPath();
@@ -279,7 +273,7 @@ export function PriceCanvas({
         ctx.setLineDash([]);
 
         // Draw second vertical reference line
-        ctx.strokeStyle = 'rgba(251, 146, 60, 0.4)';
+        ctx.strokeStyle = "rgba(251, 146, 60, 0.4)";
         ctx.lineWidth = 2.5;
         ctx.setLineDash([3, 3]);
         ctx.beginPath();
@@ -291,21 +285,21 @@ export function PriceCanvas({
         // Draw current price indicator - smooth animations
         const indicatorX = smoothedXRef.current;
         const indicatorY = currentY;
-        
+
         // Smooth pulsing glow - slower frequency
         const pulseGlow = 7 + Math.sin(animationTimeRef.current * 1.0) * 2; // Reduced from 3.5*3 to 1.0*2
         const pulseSize = 5 + Math.sin(animationTimeRef.current * 1.2) * 0.4; // Reduced from 4*0.6 to 1.2*0.4
 
-        ctx.fillStyle = '#F4C430';
+        ctx.fillStyle = "#F4C430";
         ctx.shadowBlur = pulseGlow;
-        ctx.shadowColor = 'rgba(244, 196, 48, 0.7)';
+        ctx.shadowColor = "rgba(244, 196, 48, 0.7)";
         ctx.beginPath();
         ctx.arc(indicatorX, indicatorY, pulseSize, 0, Math.PI * 2);
         ctx.fill();
 
         // Horizontal line - smooth wave
         const lineWave = Math.sin(animationTimeRef.current * 1.0) * 0.3; // Reduced from 2.5*0.5 to 1.0*0.3
-        ctx.strokeStyle = '#F4C430';
+        ctx.strokeStyle = "#F4C430";
         ctx.lineWidth = 1;
         ctx.shadowBlur = 2;
         ctx.beginPath();
@@ -325,7 +319,7 @@ export function PriceCanvas({
     const animationId = requestAnimationFrame(animate);
 
     return () => {
-      window.removeEventListener('resize', updateCanvasSize);
+      window.removeEventListener("resize", updateCanvasSize);
       cancelAnimationFrame(animationId);
     };
   }, [priceHistory, currentPrice, priceScale, currentTime]);
@@ -334,8 +328,7 @@ export function PriceCanvas({
     <canvas
       ref={canvasRef}
       className="w-full h-full"
-      style={{ imageRendering: 'crisp-edges' }}
+      style={{ imageRendering: "crisp-edges" }}
     />
   );
 }
-
