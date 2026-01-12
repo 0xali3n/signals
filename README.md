@@ -195,15 +195,7 @@ src/
 - **Contract**: ⏳ Structure created, needs Rust implementation
 - **Deployment**: ⏳ Ready when contract is built
 
-## 🚧 Next Steps
 
-1. ✅ Frontend betting integration complete
-2. ✅ MVP mode working (no contract needed for testing)
-3. ⏳ Implement Rust contract in `contract/` directory
-4. ⏳ Build WASM files: `cargo build --release --target wasm32-unknown-unknown`
-5. ⏳ Deploy to Conway Testnet
-6. ⏳ Update Application ID in `src/config/contract.ts`
-7. ⏳ Test end-to-end with on-chain bets
 
 ## 🔗 Resources
 
