@@ -45,11 +45,12 @@ export function GameView({ market, userBet }: GameViewProps) {
     null
   );
   // Track boxes being blasted (hit by live price line) - per individual box
+  // Using performance.now() for startTime for smoother animation timing
   const [blastedBoxes, setBlastedBoxes] = useState<
     Map<
       string,
       {
-        startTime: number;
+        startTime: number; // performance.now() timestamp
         priceLevel: number;
         timestamp: number;
         isSelected: boolean;
@@ -327,11 +328,11 @@ export function GameView({ market, userBet }: GameViewProps) {
   }, [currentTime]);
 
   // Update current time continuously for smooth timeline scrolling
-  // Throttle to ~60fps for better performance
+  // Throttle to ~30fps for better performance (reduced from 60fps)
   useEffect(() => {
     let animationFrameId: number;
     let lastTime = 0;
-    const targetFPS = 60;
+    const targetFPS = 30; // Reduced for better performance
     const interval = 1000 / targetFPS;
 
     const updateTime = (currentFrameTime: number) => {
@@ -369,7 +370,25 @@ export function GameView({ market, userBet }: GameViewProps) {
     return -1;
   }, [currentPrice, initialLivePrice]);
 
+  // Use refs to avoid dependency issues and reduce re-renders
+  const blastedBoxesRef = useRef(blastedBoxes);
+  const selectedBlocksMapRef = useRef(selectedBlocksMap);
+  const selectedCountByTimestampRef = useRef(selectedCountByTimestamp);
+
+  useEffect(() => {
+    blastedBoxesRef.current = blastedBoxes;
+  }, [blastedBoxes]);
+
+  useEffect(() => {
+    selectedBlocksMapRef.current = selectedBlocksMap;
+  }, [selectedBlocksMap]);
+
+  useEffect(() => {
+    selectedCountByTimestampRef.current = selectedCountByTimestamp;
+  }, [selectedCountByTimestamp]);
+
   // Detect individual boxes being hit and trigger blast animation
+  // Optimized: Only check when position changes significantly
   useEffect(() => {
     const hitThreshold = 8; // Pixels - when box left edge is this close, trigger blast
     const blastDuration = 120; // ms - how long the blast animation lasts (fast and snappy)
@@ -377,10 +396,22 @@ export function GameView({ market, userBet }: GameViewProps) {
     // Only check if we have a valid current price row
     if (currentPriceRowIndex < 0) return;
 
-    timelineMarkers.forEach((marker) => {
+    // Early exit if no markers
+    if (timelineMarkers.length === 0) return;
+
+    const avgBoxWidth = TIMELINE_MIN_SPACING * 0.85 * 0.85;
+    const priceLevel = priceLevelsPerRow[currentPriceRowIndex];
+
+    // Only check markers near the live price line (optimization)
+    const checkRange = hitThreshold + avgBoxWidth;
+    const markersToCheck = timelineMarkers.filter((marker) => {
       const adjustedPosition = marker.xPosition + timelineScrollOffset;
-      // Calculate left edge of box (assuming average box width)
-      const avgBoxWidth = TIMELINE_MIN_SPACING * 0.85 * 0.85;
+      const leftEdge = adjustedPosition - avgBoxWidth / 2;
+      return Math.abs(leftEdge - nowPixelPosition) < checkRange;
+    });
+
+    markersToCheck.forEach((marker) => {
+      const adjustedPosition = marker.xPosition + timelineScrollOffset;
       const leftEdge = adjustedPosition - avgBoxWidth / 2;
       const distanceFromLine = leftEdge - nowPixelPosition;
 
@@ -389,24 +420,22 @@ export function GameView({ market, userBet }: GameViewProps) {
         distanceFromLine <= hitThreshold &&
         distanceFromLine >= -hitThreshold
       ) {
-        // Get the price level for the row that the current price is at
-        const priceLevel = priceLevelsPerRow[currentPriceRowIndex];
         const boxKey = `${priceLevel}-${marker.time}`;
 
         // Check if this specific box hasn't been blasted yet
-        if (!blastedBoxes.has(boxKey)) {
+        if (!blastedBoxesRef.current.has(boxKey)) {
           // Check if this box is selected
-          const isSelected = selectedBlocksMap.has(boxKey);
+          const isSelected = selectedBlocksMapRef.current.has(boxKey);
 
           // Check if user has selected any boxes in this column (has played)
           const hasPlayedInColumn =
-            (selectedCountByTimestamp.get(marker.time) ?? 0) > 0;
+            (selectedCountByTimestampRef.current.get(marker.time) ?? 0) > 0;
 
           // Trigger blast animation for this specific box only
           setBlastedBoxes((prev) => {
             const newMap = new Map(prev);
             newMap.set(boxKey, {
-              startTime: Date.now(),
+              startTime: performance.now(), // Use performance.now() for smoother animation
               priceLevel,
               timestamp: marker.time,
               isSelected,
@@ -420,13 +449,13 @@ export function GameView({ market, userBet }: GameViewProps) {
               setGameResult({
                 type: "win",
                 message: "You Win!",
-                timestamp: Date.now(),
+                timestamp: performance.now(),
               });
             } else {
               setGameResult({
                 type: "lose",
                 message: "You Lose",
-                timestamp: Date.now(),
+                timestamp: performance.now(),
               });
             }
 
@@ -455,11 +484,8 @@ export function GameView({ market, userBet }: GameViewProps) {
     timelineMarkers,
     timelineScrollOffset,
     nowPixelPosition,
-    blastedBoxes,
     currentPriceRowIndex,
     priceLevelsPerRow,
-    selectedBlocksMap,
-    selectedCountByTimestamp,
   ]);
 
   return (
@@ -530,6 +556,9 @@ export function GameView({ market, userBet }: GameViewProps) {
                     // Show when: left edge > nowPixelPosition
                     const leftEdge = adjustedPosition - boxWidth / 2;
 
+                    // Early exit optimization: skip if way past the line
+                    if (leftEdge < nowPixelPosition - 50) return false;
+
                     // Get price level for this row
                     const priceLevel = priceLevelsPerRow[rowIndex];
                     // Check if this specific box is being blasted - keep it visible during animation
@@ -549,8 +578,12 @@ export function GameView({ market, userBet }: GameViewProps) {
                     const boxKey = `${priceLevel}-${marker.time}`;
                     const blastData = blastedBoxes.get(boxKey);
                     const isBlasted = !!blastData;
+                    // Use requestAnimationFrame time for smoother progress calculation
                     const blastProgress = blastData
-                      ? Math.min((Date.now() - blastData.startTime) / 120, 1)
+                      ? Math.min(
+                          (performance.now() - blastData.startTime) / 120,
+                          1
+                        )
                       : 0; // 120ms animation duration
 
                     // Check if box is in "no bets allowed" zone (between referenceLineX and oneMinuteLineX)
@@ -601,17 +634,19 @@ export function GameView({ market, userBet }: GameViewProps) {
                       const hasPlayed =
                         (selectedCountByTimestamp.get(marker.time) ?? 0) > 0;
 
-                      // More intense, faster animation
+                      // Smoother animation with easing
+                      // Use ease-out curve for smoother feel
+                      const easedProgress = 1 - Math.pow(1 - blastProgress, 3); // Cubic ease-out
                       const shake =
-                        Math.sin(blastProgress * Math.PI * 15) *
-                        (1 - blastProgress) *
-                        4;
+                        Math.sin(easedProgress * Math.PI * 12) *
+                        (1 - easedProgress) *
+                        2.5;
                       const scale =
-                        1 + (1 - blastProgress) * 0.15 - blastProgress * 0.4;
+                        1 + (1 - easedProgress) * 0.12 - easedProgress * 0.35;
                       const rotation =
-                        (1 - blastProgress) *
-                        Math.sin(blastProgress * Math.PI * 8) *
-                        8;
+                        (1 - easedProgress) *
+                        Math.sin(easedProgress * Math.PI * 6) *
+                        6;
 
                       transform = `translateX(calc(-50% + ${shake}px)) scale(${scale}) rotate(${rotation}deg)`;
                       borderOpacity = 0.95 - blastProgress * 0.8;
@@ -736,14 +771,15 @@ export function GameView({ market, userBet }: GameViewProps) {
                           cursor,
                           transition: isBlasted
                             ? "none"
-                            : "transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
+                            : "transform 0.12s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.12s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.12s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.12s cubic-bezier(0.4, 0, 0.2, 1)",
                           opacity: isBlasted
                             ? opacity
                             : isInNoBetsZone
                             ? 0.5
                             : 1,
-                          willChange:
-                            "transform, box-shadow, border-color, background-color, opacity",
+                          willChange: isBlasted
+                            ? "transform, opacity"
+                            : "transform, box-shadow",
                         }}
                         onClick={() =>
                           handleBoxClick(
@@ -828,32 +864,43 @@ export function GameView({ market, userBet }: GameViewProps) {
                             })()}
                           </div>
                         )}
-                        {/* Price level text inside box */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <span
-                            className={`text-[10px] font-semibold ${
-                              isBlasted
-                                ? "text-orange-300"
-                                : isSelected
-                                ? "text-orange-200"
-                                : isInNoBetsZone
-                                ? "text-orange-500/40"
-                                : "text-orange-400/70"
-                            }`}
-                            style={{
-                              textShadow: isBlasted
-                                ? "0 0 4px rgba(255, 100, 0, 0.8)"
-                                : isSelected
-                                ? "0 0 2px rgba(251, 146, 60, 0.4)"
-                                : "0 0 1px rgba(0, 0, 0, 0.3)",
-                              transform: isBlasted
-                                ? `scale(${1 + (1 - blastProgress) * 0.2})`
-                                : "none",
-                            }}
-                          >
-                            ${priceLevel.toLocaleString()}
-                          </span>
-                        </div>
+                        {/* Price level text inside box - optimized rendering */}
+                        {!isBlasted && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <span
+                              className={`text-[10px] font-semibold ${
+                                isSelected
+                                  ? "text-orange-200"
+                                  : isInNoBetsZone
+                                  ? "text-orange-500/40"
+                                  : "text-orange-400/70"
+                              }`}
+                              style={{
+                                textShadow: isSelected
+                                  ? "0 0 2px rgba(251, 146, 60, 0.4)"
+                                  : "0 0 1px rgba(0, 0, 0, 0.3)",
+                              }}
+                            >
+                              ${priceLevel.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        {/* Blasted box text - only render during blast */}
+                        {isBlasted && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <span
+                              className="text-[10px] font-semibold text-orange-300"
+                              style={{
+                                textShadow: "0 0 4px rgba(255, 100, 0, 0.8)",
+                                transform: `scale(${
+                                  1 + (1 - blastProgress) * 0.2
+                                })`,
+                              }}
+                            >
+                              ${priceLevel.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
                         {/* Minimal check icon for selected state - positioned at top-right */}
                         {isSelected && !isBlasted && (
                           <div className="absolute top-1 right-1 pointer-events-none">
@@ -888,7 +935,7 @@ export function GameView({ market, userBet }: GameViewProps) {
             transform:
               priceLinePulse > 0
                 ? `translateX(calc(-50% + ${
-                    priceLinePulse * Math.sin(Date.now() / 50) * 2
+                    priceLinePulse * Math.sin(performance.now() / 50) * 2
                   }px))`
                 : "translateX(-50%)",
             background:
@@ -968,6 +1015,9 @@ export function GameView({ market, userBet }: GameViewProps) {
               Current Price
             </div>
             <div className="text-[9px] sm:text-[10px] font-semibold text-orange-400/80 bg-orange-500/20 px-1.5 sm:px-2 py-0.5 rounded">
+              BTC/USDT
+            </div>
+            <div className="text-[9px] sm:text-[10px] font-semibold text-slate-500 bg-slate-800/50 px-1.5 sm:px-2 py-0.5 rounded">
               BINANCE
             </div>
           </div>

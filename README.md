@@ -4,7 +4,7 @@ A real-time crypto prediction game built on **Linera Conway Testnet** for the Ak
 
 ## 🎯 Product
 
-Users predict whether BTC price will be **ABOVE** or **BELOW** a target price at a fixed time. Users stake test tokens, and the total pooled amount is distributed to winners.
+Users select betting blocks representing specific price levels. Each block requires **100 tokens** to bet. When the live price line hits a selected block, users win and share the **column pool** equally. All bets and rewards are managed on-chain via Linera smart contracts.
 
 ## 🚀 Tech Stack
 
@@ -32,49 +32,45 @@ Users predict whether BTC price will be **ABOVE** or **BELOW** a target price at
 - ✅ **Price Canvas**: Interactive canvas showing price history with stable, smooth line rendering
 - ✅ **Timeline Component**: Scrolling timeline with time markers and "NOW" indicator
 - ✅ **Price Scale**: Left-side price scale with $10 increments, fixed range based on initial live price
-- ✅ **Betting Blocks System**: Advanced interactive betting block system
-  - ✅ **Box Grid**: 15 rows of betting blocks aligned with price levels ($10 increments)
-  - ✅ **Movement**: Smooth right-to-left scrolling synchronized with timeline (hardware-accelerated)
-  - ✅ **Box Selection**: Users can select up to 3 boxes per column (same timestamp)
-  - ✅ **Toggle Selection**: Click to select/unselect boxes with visual feedback
-  - ✅ **Selection State**: Clear visual indicators (check icon, glow, scale-up) for selected boxes
-  - ✅ **Price Display**: Each box displays its price level inside
-  - ✅ **Vanishing Logic**: Boxes disappear instantly when left edge touches live price line
-  - ✅ **Spacing**: Proper spacing maintained (85% of timeline spacing) to prevent overlap
-  - ✅ **Interactive**: Clickable boxes with professional hover effects
-  - ✅ **No Bets Zone**: Visual distinction for boxes in "no bets allowed" zone (greyed out, disabled)
-  - ✅ **Max Selection Limit**: Visual feedback when column reaches 3 selections (dimmed, not-allowed cursor)
-  - ✅ **Error Handling**: Error message when trying to select more than 3 boxes per column
+- ✅ **Betting Blocks System**: Interactive betting blocks with selection, movement, and visual feedback
+  - ✅ **Box Grid**: 15 rows aligned with price levels ($10 increments)
+  - ✅ **Selection**: Up to 3 boxes per column, click to toggle
+  - ✅ **Visual States**: Normal, Selected (check icon + glow), No Bets Zone (greyed out), Max Selections (dimmed)
+  - ✅ **Price Display**: Each box shows its price level
+  - ✅ **Movement**: Smooth right-to-left scrolling (hardware-accelerated)
+  - ✅ **Vanishing**: Disappears instantly when left edge touches live price line
+  - ✅ **Error Handling**: Error message when exceeding 3 selections per column
 - ✅ **Blast Animation System**: Professional hit detection and visual feedback
   - ✅ **Individual Box Blasting**: Only the specific box hit by live price line blasts (not entire column)
-  - ✅ **Color-Coded Blasts**: 
+  - ✅ **Color-Coded Blasts**:
     - 🟢 **Green Blast**: Selected box hit (win)
     - 🔴 **Red Blast**: Non-selected box hit in column where user played (lose)
     - 🟠 **Orange Blast**: Box hit in column where user hasn't played (neutral)
   - ✅ **Animation Effects**: Shake, scale, rotation, crack patterns, multi-layer glow
-  - ✅ **Fast Duration**: 120ms blast animation for snappy feel
+  - ✅ **Smooth Animation**: 120ms duration with cubic ease-out easing for smooth feel
   - ✅ **Crack Patterns**: SVG crack overlays with color matching win/lose state
-- ✅ **Win/Lose Detection**: Intelligent game result system
-  - ✅ **Conditional Notifications**: Only shows win/lose popup if user has selected boxes in that column
-  - ✅ **Professional Popups**: 
-    - Bounce animation with rotation
-    - Gradient backgrounds with glow effects
-    - Pulsing icon animations
-    - Auto-dismiss after 2.5 seconds
-  - ✅ **Visual Feedback**: Color-coded borders, backgrounds, and glows based on result
-- ✅ **Fixed Price Scale**: Price scale centered on initial live price from Binance (no auto-rebalancing)
-  - ✅ **Initial Price Fetch**: Fetches live BTC price from Binance REST API on page load/refresh
-  - ✅ **Fixed Range**: ±$70 range ($10 increments, 7 levels above/below) centered on initial price
-  - ✅ **Alignment**: Ensures betting blocks align correctly with price levels
+- ✅ **Win/Lose Detection**: Conditional notifications (only if user has selected boxes in that column)
+  - ✅ **Popups**: Bounce animation, gradient backgrounds, pulsing icons, auto-dismiss (2.5s)
+  - ✅ **Visual Feedback**: Color-coded borders, backgrounds, and glows
+- ✅ **Fixed Price Scale**: Centered on initial live price from Binance (no auto-rebalancing)
+  - ✅ **Initial Price Fetch**: Fetches live BTC price from Binance REST API on load/refresh
+  - ✅ **Fixed Range**: ±$70 range ($10 increments, 15 levels total)
 - ✅ **Betting Panel**: Integrated betting interface with claim rewards functionality
-- ✅ **HUD Elements**: Current price display with Binance badge, user bet status
+- ✅ **HUD Elements**: Current price display with BTC/USDT and Binance badges, user bet status
 - ✅ **Live Price Line**: Vertical dashed line at 30% from left showing current time/price position
   - ✅ **Pulse Animation**: Price line pulses/shakes when hitting boxes
   - ✅ **Enhanced Glow**: Dynamic glow effects on impact
+- ✅ **Game Info Popup**: "How to Play" information accessible via info button in header
+  - ✅ **Responsive Design**: Mobile-optimized with proper sizing and spacing
+  - ✅ **Professional Layout**: Card-based step-by-step guide explaining game mechanics
 
 ### UI Components
 
-- ✅ **Header**: Displays wallet address, chainId, and quick actions (export/disconnect) with responsive design
+- ✅ **Header**:
+  - Displays wallet address, chainId, and quick actions (export/disconnect)
+  - Game info button with "How to Play" popup
+  - View Details popup with click-outside-to-close functionality
+  - Fully responsive design
 - ✅ **Wallet Setup**: Creation and import interface with file upload
 - ✅ **Wallet Created**: Success screen after wallet creation
 - ✅ **Wallet Creation Progress**: Step-by-step progress UI with real-time status
@@ -87,10 +83,13 @@ Users predict whether BTC price will be **ABOVE** or **BELOW** a target price at
 - ✅ **Performance Optimizations**:
   - ✅ **Memoized Lookups**: O(1) Map-based selection checks instead of O(n) array searches
   - ✅ **Hardware Acceleration**: GPU-accelerated transforms using `translate3d`
-  - ✅ **Throttled Updates**: 60fps throttled time updates to prevent excessive re-renders
-  - ✅ **Optimized Event Handlers**: `useCallback` for stable function references
+  - ✅ **Throttled Updates**: 30fps throttled time updates for optimal performance
+  - ✅ **Optimized Blast Detection**: Only checks markers near live price line (filtered before loop)
+  - ✅ **Early Exit Optimization**: Boxes way past the line are filtered out early
+  - ✅ **Optimized Event Handlers**: `useCallback` and refs to avoid dependency issues
   - ✅ **Efficient State Management**: Minimal re-renders with proper memoization
-  - ✅ **Smooth Transitions**: Cubic-bezier easing for professional feel
+  - ✅ **Smooth Transitions**: Cubic-bezier easing with reduced durations (0.12s)
+  - ✅ **Performance.now()**: Used for smoother animation timing
 - ✅ **Responsive Design**: Mobile-first approach with Tailwind breakpoints
 - ✅ **Clean Code**: Removed unused code, fixed bugs, consistent styling
 - ✅ **Professional UI**: Clean, minimal, aesthetic design with smooth animations
@@ -157,89 +156,20 @@ src/
 
 ## 🎮 Game Mechanics
 
-### Betting Blocks System
+### How to Play
 
-- **Box Grid**: 15 horizontal rows of betting blocks, each row representing a $10 price increment
-- **Price Levels**: Each box is mapped to a specific price level (stored in `data-price-level` attribute)
-- **Price Display**: Each box displays its price level inside (e.g., "$90,730")
-- **Movement**: Boxes scroll smoothly from right to left at 2 pixels/second (hardware-accelerated)
-- **Selection System**:
-  - Users can select up to **3 boxes per column** (same timestamp)
-  - Click to toggle selection (select/unselect)
-  - Clear visual feedback: check icon, glow, subtle scale-up
-  - Error message when trying to exceed limit
-  - Footer note explaining the limit
-- **Vanishing**: Boxes disappear instantly when their left edge touches the live price line
-- **Spacing**: Boxes maintain proper spacing (85% of 110px = ~93.5px width) to prevent overlap
-- **Interactivity**: 
-  - Professional hover effects: subtle scale, enhanced glow
-  - Clickable with smooth transitions
-  - Visual feedback: Gradient opacity based on distance from live price line
-  - Disabled state for "no bets allowed" zone (greyed out, not-allowed cursor)
-- **Visual States**:
-  - **Normal**: Standard orange glow with distance-based opacity
-  - **Selected**: Enhanced glow, check icon, "SELECTED" label, ring border
-  - **No Bets Zone**: Greyed out (40% opacity), subtle glow, disabled
-  - **Max Selections**: Dimmed when column has 3 selections
+1. **Select Blocks**: Click betting blocks to select (max 3 per column). Each block = one price level.
+2. **Place Bet**: 100 tokens per block. Added to column pool. Multiple users can bet.
+3. **Watch & Win**: Live price line moves right to left. When it hits your block → You Win!
+4. **Rewards**: Winners share the column pool equally. Distributed via Linera smart contract.
 
-### Blast Animation System
+### Key Features
 
-- **Hit Detection**: Detects when live price line touches a box (8px threshold)
-- **Individual Box Blasting**: Only the specific box that gets hit blasts (not entire column)
-- **Fast Animation**: 120ms duration for snappy, responsive feel
-- **Color-Coded Feedback**:
-  - 🟢 **Green Blast** (Win): When a selected box is hit
-    - Green glow, green crack patterns, green borders
-    - Multi-layer green shadow effects
-  - 🔴 **Red Blast** (Lose): When a non-selected box is hit in a column where user played
-    - Red glow, red crack patterns, red borders
-    - Multi-layer red shadow effects
-  - 🟠 **Orange Blast** (Neutral): When a box is hit in a column where user hasn't played
-    - Orange glow, orange crack patterns
-    - No win/lose notification shown
-- **Animation Effects**:
-  - Shake effect (horizontal movement)
-  - Scale animation (slight grow then shrink)
-  - Rotation effect (subtle spin)
-  - Crack pattern overlay (SVG-based)
-  - Multi-layer glow effects
-  - Opacity fade-out
-- **Price Line Pulse**: Live price line pulses/shakes with enhanced glow when hitting boxes
-
-### Win/Lose Detection
-
-- **Conditional Logic**: Only shows notifications if user has selected boxes in that column
-- **Win Condition**: Selected box gets hit by live price line → Green blast + "You Win!" popup
-- **Lose Condition**: Non-selected box gets hit in column where user played → Red blast + "You Lose" popup
-- **Neutral**: Box hit in column where user hasn't played → Orange blast only (no popup)
-- **Professional Popups**:
-  - Bounce animation with rotation effect
-  - Gradient backgrounds (green/red)
-  - Pulsing icon glow
-  - Enhanced shadows and backdrop blur
-  - Large, bold text with glow effects
-  - Auto-dismiss after 2.5 seconds
-
-### Price Scale System
-
-- **Fixed Range**: Price scale is fixed based on initial live price from Binance
-- **No Auto-rebalancing**: Scale stays centered on initial price to ensure betting blocks align correctly
-- **Price Levels**: 15 levels total (±$70 from center, $10 increments)
-- **Initialization**: Fetches live price on page load/refresh and centers scale on that price
-- **Alignment**: Betting blocks perfectly align with price scale levels
-
-### Timeline & Movement
-
-- **Smooth Scrolling**: Uses `requestAnimationFrame` for 60fps smooth movement
-- **Throttled Updates**: Time updates throttled to ~60fps for optimal performance
-- **Time Markers**: Generated at 60-second intervals
-- **Live Price Line**: Vertical dashed line at 30% from left showing current time position
-  - Pulse animation on box hits
-  - Enhanced glow effects
-- **No Bets Zone**: Area between live price line and 1-minute future line (no betting allowed)
-  - Visual overlay with "no bets allowed" text
-  - Greyed out boxes with subtle glow
-- **Synchronization**: All boxes move in sync with timeline scroll offset
+- **Betting Blocks**: 15 rows, each row = $10 price increment. Up to 3 selections per column.
+- **Blast Animation**: 120ms smooth animation when live price hits a box. Color-coded: 🟢 Green (win), 🔴 Red (lose), 🟠 Orange (neutral).
+- **Win/Lose System**: Conditional notifications (only if user has selected boxes). Professional popups with bounce animation.
+- **Price Scale**: Fixed range centered on initial Binance price (±$70, $10 increments). No auto-rebalancing.
+- **Timeline**: Smooth scrolling with 30fps throttled updates. Live price line at 30% from left with pulse animation.
 
 ## 🎨 UI/UX Features
 
@@ -247,13 +177,16 @@ src/
 - ✅ **Smooth Animations**: Hardware-accelerated transforms, optimized transitions
 - ✅ **Visual Feedback**: Clear selection states, hover effects, loading states
 - ✅ **Error Handling**: User-friendly error messages with auto-dismiss
-- ✅ **Info Notifications**: Footer notes explaining game rules
-- ✅ **Gamified Elements**: 
+- ✅ **Info System**:
+  - Footer notes explaining game rules
+  - "How to Play" popup in header with step-by-step guide
+  - Responsive popup positioning and sizing
+- ✅ **Gamified Elements**:
   - Bounce animations for win/lose popups
   - Pulsing icon effects
   - Multi-layer glow effects
   - Color-coded feedback system
-- ✅ **Performance**: Optimized for 60fps smooth gameplay
+- ✅ **Performance**: Optimized for smooth gameplay (30fps throttling, optimized blast detection, early exit filters)
 
 ## ⚠️ Known Limitations
 
@@ -267,9 +200,6 @@ src/
 - Connect frontend to contract for on-chain betting
 - Implement transaction signing with Linera client
 - Re-enable balance display (once validator URL issue is resolved)
-- Add sound effects for win/lose events (optional)
-- Implement betting amount selection per box
-- Add statistics/history tracking
 
 ## 🔗 Resources
 
