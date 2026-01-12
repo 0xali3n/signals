@@ -7,6 +7,8 @@ import { PriceCanvas } from "./PriceCanvas";
 import { PriceScale } from "./PriceScale";
 import { BettingPanel } from "./BettingPanel";
 import { usePriceScale } from "../hooks/usePriceScale";
+import { useMarket } from "../hooks/useMarket";
+import { useWalletStore } from "../store/walletStore";
 
 interface GameViewProps {
   market: Market;
@@ -23,6 +25,9 @@ interface PricePoint {
 }
 
 export function GameView({ market, userBet }: GameViewProps) {
+  const { placeBet } = useMarket();
+  const { updateBalance } = useWalletStore();
+  const processedWinsRef = useRef<Set<string>>(new Set()); // Track processed wins to avoid duplicate rewards
   const [currentPrice, setCurrentPrice] = useState(market.targetPrice);
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
   const [currentTime, setCurrentTime] = useState(Date.now());
@@ -38,12 +43,15 @@ export function GameView({ market, userBet }: GameViewProps) {
     Array<{
       priceLevel: number;
       timestamp: number;
+      betId?: string; // Track bet ID if placed on-chain
     }>
   >([]);
   // Error message for max selections
   const [maxSelectionError, setMaxSelectionError] = useState<string | null>(
     null
   );
+  // Track pending bets (being placed)
+  const [pendingBets, setPendingBets] = useState<Set<string>>(new Set());
   // Track boxes being blasted (hit by live price line) - per individual box
   // Using performance.now() for startTime for smoother animation timing
   const [blastedBoxes, setBlastedBoxes] = useState<
@@ -66,9 +74,9 @@ export function GameView({ market, userBet }: GameViewProps) {
     timestamp: number;
   } | null>(null);
 
-  // Memoized click handler
+  // Memoized click handler - now places bets when selecting boxes
   const handleBoxClick = useCallback(
-    (
+    async (
       priceLevel: number,
       timestamp: number,
       isSelected: boolean,
@@ -78,7 +86,7 @@ export function GameView({ market, userBet }: GameViewProps) {
       if (isInNoBetsZone) return;
 
       if (isSelected) {
-        // Unselect: remove from array
+        // Unselect: remove from array (and cancel bet if placed)
         setSelectedBlocks((prev) =>
           prev.filter(
             (block) =>
@@ -91,8 +99,37 @@ export function GameView({ market, userBet }: GameViewProps) {
       } else {
         // Select: check if column already has 3 selections
         if (selectedInColumn < 3) {
-          setSelectedBlocks((prev) => [...prev, { priceLevel, timestamp }]);
-          setMaxSelectionError(null);
+          const betKey = `${priceLevel}-${timestamp}`;
+
+          // Add to pending bets
+          setPendingBets((prev) => new Set(prev).add(betKey));
+
+          try {
+            // Place bet on-chain (or mock if contract not deployed)
+            const betAmount = 100; // Fixed 100 tokens per block
+            const bet = await placeBet(priceLevel, timestamp, betAmount);
+
+            // Add to selected blocks with bet ID
+            setSelectedBlocks((prev) => [
+              ...prev,
+              { priceLevel, timestamp, betId: bet.id },
+            ]);
+            setMaxSelectionError(null);
+          } catch (error) {
+            console.error("Failed to place bet:", error);
+            setMaxSelectionError(
+              error instanceof Error
+                ? error.message
+                : "Failed to place bet. Please try again."
+            );
+            setTimeout(() => setMaxSelectionError(null), 5000);
+          } finally {
+            setPendingBets((prev) => {
+              const next = new Set(prev);
+              next.delete(betKey);
+              return next;
+            });
+          }
         } else {
           // Show error message
           setMaxSelectionError(
@@ -103,7 +140,7 @@ export function GameView({ market, userBet }: GameViewProps) {
         }
       }
     },
-    []
+    [placeBet]
   );
 
   const priceScale = usePriceScale(
@@ -307,6 +344,14 @@ export function GameView({ market, userBet }: GameViewProps) {
     return map;
   }, [selectedBlocks]);
 
+  // Check if a box is pending (bet being placed)
+  const isPendingBet = useCallback(
+    (priceLevel: number, timestamp: number) => {
+      return pendingBets.has(`${priceLevel}-${timestamp}`);
+    },
+    [pendingBets]
+  );
+
   const selectedCountByTimestamp = useMemo(() => {
     const count = new Map<number, number>();
     selectedBlocks.forEach((block) => {
@@ -445,18 +490,48 @@ export function GameView({ market, userBet }: GameViewProps) {
 
           // Only show win/lose notification if user has played in this column
           if (hasPlayedInColumn) {
-            if (isSelected) {
-              setGameResult({
-                type: "win",
-                message: "You Win!",
-                timestamp: performance.now(),
-              });
+            // Process win/lose only once per box
+            if (!processedWinsRef.current.has(boxKey)) {
+              processedWinsRef.current.add(boxKey);
+
+              const betAmount = 100; // Fixed bet amount per block
+
+              if (isSelected) {
+                // WIN: Add double the bet amount (2x return)
+                // User bet 100, gets 200 back (net gain: +100)
+                const winReward = betAmount * 2;
+
+                updateBalance(winReward);
+
+                setGameResult({
+                  type: "win",
+                  message: `You Win! +${winReward} tokens`,
+                  timestamp: performance.now(),
+                });
+              } else {
+                // LOSE: Do nothing (balance already deducted when bet was placed)
+                // Money is gone - no refund
+                setGameResult({
+                  type: "lose",
+                  message: `You Lose -${betAmount} tokens`,
+                  timestamp: performance.now(),
+                });
+              }
             } else {
-              setGameResult({
-                type: "lose",
-                message: "You Lose",
-                timestamp: performance.now(),
-              });
+              // Already processed, just show notification
+              if (isSelected) {
+                setGameResult({
+                  type: "win",
+                  message: "You Win!",
+                  timestamp: performance.now(),
+                });
+              } else {
+                setGameResult({
+                  type: "lose",
+                  message: "You Lose",
+                  timestamp: performance.now(),
+                });
+              }
             }
 
             // Auto-hide notification after 2.5 seconds
@@ -605,6 +680,9 @@ export function GameView({ market, userBet }: GameViewProps) {
                       `${priceLevel}-${marker.time}`
                     );
 
+                    // Check if bet is pending
+                    const isPending = isPendingBet(priceLevel, marker.time);
+
                     // Count how many boxes are selected in this column (optimized lookup)
                     const selectedInColumn =
                       selectedCountByTimestamp.get(marker.time) || 0;
@@ -627,7 +705,18 @@ export function GameView({ market, userBet }: GameViewProps) {
                       cursor,
                       opacity;
 
-                    if (isBlasted) {
+                    if (isPending) {
+                      // Pending bet state: pulsing animation
+                      const pulse = Math.sin(Date.now() / 200) * 0.1 + 0.9;
+                      borderOpacity = 0.7 * pulse;
+                      bgOpacity = 0.15 * pulse;
+                      boxShadow = `0 0 ${12 * pulse}px rgba(251, 146, 60, ${
+                        0.4 * pulse
+                      })`;
+                      transform = "translateX(-50%)";
+                      cursor = "wait";
+                      opacity = pulse;
+                    } else if (isBlasted) {
                       // Blast animation state - cracked and exploding
                       // Color depends on whether box was selected (win = green, lose = red)
                       const isWin = blastData?.isSelected ?? false;
@@ -781,15 +870,17 @@ export function GameView({ market, userBet }: GameViewProps) {
                             ? "transform, opacity"
                             : "transform, box-shadow",
                         }}
-                        onClick={() =>
-                          handleBoxClick(
-                            priceLevel,
-                            marker.time,
-                            isSelected,
-                            isInNoBetsZone,
-                            selectedInColumn
-                          )
-                        }
+                        onClick={async () => {
+                          if (!isPending) {
+                            await handleBoxClick(
+                              priceLevel,
+                              marker.time,
+                              isSelected,
+                              isInNoBetsZone,
+                              selectedInColumn
+                            );
+                          }
+                        }}
                         onMouseEnter={(e) => {
                           if (
                             !isInNoBetsZone &&
@@ -867,22 +958,31 @@ export function GameView({ market, userBet }: GameViewProps) {
                         {/* Price level text inside box - optimized rendering */}
                         {!isBlasted && (
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <span
-                              className={`text-[10px] font-semibold ${
-                                isSelected
-                                  ? "text-orange-200"
-                                  : isInNoBetsZone
-                                  ? "text-orange-500/40"
-                                  : "text-orange-400/70"
-                              }`}
-                              style={{
-                                textShadow: isSelected
-                                  ? "0 0 2px rgba(251, 146, 60, 0.4)"
-                                  : "0 0 1px rgba(0, 0, 0, 0.3)",
-                              }}
-                            >
-                              ${priceLevel.toLocaleString()}
-                            </span>
+                            {isPending ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="w-3 h-3 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
+                                <span className="text-[9px] text-orange-400/80">
+                                  Placing...
+                                </span>
+                              </div>
+                            ) : (
+                              <span
+                                className={`text-[10px] font-semibold ${
+                                  isSelected
+                                    ? "text-orange-200"
+                                    : isInNoBetsZone
+                                    ? "text-orange-500/40"
+                                    : "text-orange-400/70"
+                                }`}
+                                style={{
+                                  textShadow: isSelected
+                                    ? "0 0 2px rgba(251, 146, 60, 0.4)"
+                                    : "0 0 1px rgba(0, 0, 0, 0.3)",
+                                }}
+                              >
+                                ${priceLevel.toLocaleString()}
+                              </span>
+                            )}
                           </div>
                         )}
                         {/* Blasted box text - only render during blast */}

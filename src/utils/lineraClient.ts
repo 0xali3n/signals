@@ -162,11 +162,50 @@ export async function getChainIdentity(client: Client, chainId: string): Promise
 }
 
 /**
- * Query an application
+ * Call application method (execute operation)
  * @param client - Linera Client instance
  * @param chainId - Chain ID where application is deployed
  * @param applicationId - Application ID
- * @param query - Query string
+ * @param operation - Operation to execute (JSON-serializable)
+ */
+export async function callApplication(
+  client: Client,
+  chainId: string,
+  applicationId: string,
+  operation: any
+): Promise<string> {
+  try {
+    const chain = await client.chain(chainId);
+    const app = await chain.application(applicationId);
+    
+    // Execute operation - Linera client API may vary by version
+    // Using type assertion to handle API differences
+    const appAny = app as any;
+    
+    // Try different possible method names
+    if (typeof appAny.execute === 'function') {
+      const result = await appAny.execute({
+        operation: JSON.stringify(operation),
+      });
+      return result;
+    } else if (typeof appAny.processOperation === 'function') {
+      const result = await appAny.processOperation(JSON.stringify(operation));
+      return result;
+    } else {
+      throw new Error('Application execute method not found. Check @linera/client API version.');
+    }
+  } catch (error) {
+    console.error('Application call failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Query an application (GraphQL query)
+ * @param client - Linera Client instance
+ * @param chainId - Chain ID where application is deployed
+ * @param applicationId - Application ID
+ * @param query - GraphQL query string
  * @param options - Optional query options
  */
 export async function queryApplication(
@@ -183,6 +222,29 @@ export async function queryApplication(
     return result;
   } catch (error) {
     console.error('Query failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Query application state (convenience wrapper for GraphQL queries)
+ * @param client - Linera Client instance
+ * @param chainId - Chain ID where application is deployed
+ * @param applicationId - Application ID
+ * @param query - GraphQL query string
+ */
+export async function queryApplicationState(
+  client: Client,
+  chainId: string,
+  applicationId: string,
+  query: string
+): Promise<any> {
+  try {
+    const response = await queryApplication(client, chainId, applicationId, query);
+    const data = JSON.parse(response);
+    return data;
+  } catch (error) {
+    console.error('Query state failed:', error);
     throw error;
   }
 }

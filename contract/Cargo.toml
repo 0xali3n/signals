@@ -1,0 +1,27 @@
+[package]
+name = "signals"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "signals_contract"
+path = "src/contract.rs"
+
+[[bin]]
+name = "signals_service"
+path = "src/service.rs"
+
+[dependencies]
+linera-sdk = { git = "https://github.com/linera-io/linera-protocol", tag = "v0.15.8" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+async-trait = "0.1"
+linera-views = { git = "https://github.com/linera-io/linera-protocol", tag = "v0.15.8" }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1

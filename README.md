@@ -188,18 +188,22 @@ src/
   - Color-coded feedback system
 - ✅ **Performance**: Optimized for smooth gameplay (30fps throttling, optimized blast detection, early exit filters)
 
-## ⚠️ Known Limitations
+## ⚠️ Current Status
 
-- **Balance Display**: Temporarily removed due to validator URL configuration issues in the Linera client library. The Wallet instance from the faucet appears to have a hardcoded validator URL that overrides client options. Balance functionality will be re-enabled once the library issue is resolved or a workaround is found.
-- **Contract Integration**: Currently using mock market data. Linera contract integration is pending.
+- **Frontend**: ✅ Complete with MVP mode (works without contract)
+- **Betting Integration**: ✅ Box selection triggers bet placement
+- **Contract**: ⏳ Structure created, needs Rust implementation
+- **Deployment**: ⏳ Ready when contract is built
 
 ## 🚧 Next Steps
 
-- Build Linera Rust contract for prediction market
-- Deploy contract to Conway Testnet
-- Connect frontend to contract for on-chain betting
-- Implement transaction signing with Linera client
-- Re-enable balance display (once validator URL issue is resolved)
+1. ✅ Frontend betting integration complete
+2. ✅ MVP mode working (no contract needed for testing)
+3. ⏳ Implement Rust contract in `contract/` directory
+4. ⏳ Build WASM files: `cargo build --release --target wasm32-unknown-unknown`
+5. ⏳ Deploy to Conway Testnet
+6. ⏳ Update Application ID in `src/config/contract.ts`
+7. ⏳ Test end-to-end with on-chain bets
 
 ## 🔗 Resources
 

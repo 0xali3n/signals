@@ -1,14 +1,29 @@
 // Main header component with wallet address display
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWalletStore } from '../store/walletStore';
 import { exportWallet } from '../utils/wallet';
 
 export function Header() {
-  const { wallet, username, deleteWallet } = useWalletStore();
+  const { wallet, username, balance, deleteWallet, fetchBalance } = useWalletStore();
   const [showMenu, setShowMenu] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showGameInfo, setShowGameInfo] = useState(false);
+
+  // Fetch balance periodically when wallet is connected
+  useEffect(() => {
+    if (!wallet || !wallet.chainId) return;
+
+    // Fetch immediately
+    fetchBalance();
+
+    // Refresh balance every 30 seconds
+    const interval = setInterval(() => {
+      fetchBalance();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [wallet, fetchBalance]);
 
   const handleDisconnect = () => {
     if (confirm('Are you sure you want to disconnect? You can import your wallet later.')) {
@@ -41,13 +56,23 @@ export function Header() {
       <div className="container mx-auto px-4 sm:px-6 py-3 max-w-full">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-white font-bold text-sm">S</span>
+            <div className="flex items-center">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                <img 
+                  src="/logo.png" 
+                  alt="Signals" 
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    // Fallback to text if image fails to load
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    if (target.parentElement) {
+                      target.parentElement.innerHTML = '<span class="text-white font-bold text-lg">S</span>';
+                      target.parentElement.className = 'w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center flex-shrink-0';
+                    }
+                  }}
+                />
               </div>
-              <h1 className="text-base sm:text-lg font-semibold text-orange-400 tracking-tight">
-                Signals
-              </h1>
             </div>
             <span className="text-[10px] sm:text-xs px-2 py-0.5 bg-orange-500/10 text-orange-400 rounded-md font-medium border border-orange-500/20 whitespace-nowrap">
               Conway Testnet
@@ -168,6 +193,28 @@ export function Header() {
 
           {wallet && (
             <div className="flex items-center gap-2 sm:gap-3 relative">
+              {/* Balance Display */}
+              <div className="text-right pr-2 sm:pr-3 border-r border-orange-500/20">
+                <div className="flex items-center gap-1.5 justify-end mb-0.5">
+                  <svg className="w-3.5 h-3.5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-xs sm:text-sm font-mono font-semibold text-orange-300">
+                    {balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </p>
+                  <button
+                    onClick={() => fetchBalance()}
+                    className="ml-1 p-0.5 hover:bg-orange-500/10 rounded transition-colors"
+                    title="Refresh balance"
+                  >
+                    <svg className="w-3 h-3 text-orange-400/60 hover:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                </div>
+                <p className="text-[9px] sm:text-[10px] text-slate-400">Balance</p>
+              </div>
+
               <div className="text-right hidden sm:block pr-2 sm:pr-3 border-r border-orange-500/20">
                 {username && (
                   <p className="text-xs sm:text-sm font-medium text-orange-300 mb-0.5 truncate max-w-[120px] sm:max-w-none">

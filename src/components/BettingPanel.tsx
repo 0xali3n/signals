@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { BetDirection } from "../types";
 import { useMarket } from "../hooks/useMarket";
-import { useWalletStore } from "../store/walletStore";
 
 interface BettingPanelProps {
   market: {
@@ -17,8 +16,7 @@ interface BettingPanelProps {
 }
 
 export function BettingPanel({ market, userBet }: BettingPanelProps) {
-  const { wallet } = useWalletStore();
-  const { placeBet, claimReward, isLoading } = useMarket();
+  const { claimReward, isLoading } = useMarket();
   const [betAmount, setBetAmount] = useState("10");
 
   if (market.isClosed && userBet && !userBet.claimed) {
@@ -58,14 +56,18 @@ export function BettingPanel({ market, userBet }: BettingPanelProps) {
                 </div>
                 <button
                   onClick={() => {
-                    const direction: BetDirection = "above";
-                    placeBet(direction, parseFloat(betAmount) || 10);
+                    // Note: This panel is for legacy betting.
+                    // New betting system uses box clicks in GameView.
+                    // This button is disabled as it requires priceLevel and timestamp.
+                    console.warn(
+                      "Legacy betting panel - use box clicks in game view instead"
+                    );
                   }}
-                  disabled={isLoading || !wallet}
-                  className="px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-sm sm:text-base font-semibold rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  disabled={true}
+                  className="px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-orange-500/50 to-amber-500/50 hover:from-orange-600/50 hover:to-amber-600/50 text-white/50 text-sm sm:text-base font-semibold rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-not-allowed"
                 >
                   <span>⬆️</span>
-                  <span>{isLoading ? "Placing..." : "BET UP"}</span>
+                  <span>Use Box Clicks to Bet</span>
                 </button>
               </>
             ) : (
