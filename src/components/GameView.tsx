@@ -1,5 +1,5 @@
 // Futuristic crypto prediction game interface
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { Market, BetDirection } from "../types";
 import { subscribeToBTCPrice } from "../utils/btcPrice";
 import { Timeline } from "./Timeline";
@@ -26,11 +26,23 @@ export function GameView({ market, userBet }: GameViewProps) {
   const [currentPrice, setCurrentPrice] = useState(market.targetPrice);
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const [containerWidth, setContainerWidth] = useState(1920);
+  const [containerHeight, setContainerHeight] = useState(1080);
+  const [viewOffset, setViewOffset] = useState(0); // Timeline navigation offset
+  const containerRef = useRef<HTMLDivElement>(null);
+  const startTimeRef = useRef<number>(Date.now());
   const priceScale = usePriceScale(
     priceHistory,
     currentPrice,
     market.targetPrice
   );
+
+  // Timeline constants (matching Timeline component)
+  const CURRENT_TIME_POSITION = 30; // Percentage from left
+  const GRID_INTERVAL_SECONDS = 60; // Grid marks every 60 seconds
+  const TIMELINE_SCROLL_SPEED = 2; // Pixels per second
+  const TIMELINE_POSITION_OFFSET = 0;
+  const TIMELINE_MIN_SPACING = 110; // Pixels
 
   // Subscribe to real-time BTC price
   useEffect(() => {
@@ -55,6 +67,124 @@ export function GameView({ market, userBet }: GameViewProps) {
     };
   }, [market.targetPrice]);
 
+  // Update container width and height on mount and resize
+  useEffect(() => {
+    const updateSize = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+        setContainerHeight(containerRef.current.offsetHeight);
+      }
+    };
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
+
+  // Calculate vertical line positions (matching PriceCanvas logic)
+  const verticalLinePositions = useMemo(() => {
+    const priceCanvasOffset = 112; // 7rem (left-28) in pixels
+    const availableWidth = containerWidth - priceCanvasOffset;
+    const priceLineX = availableWidth * 0.3; // 30% from left of canvas area
+    const referenceLineX = priceCanvasOffset + priceLineX;
+
+    const timeWindow = 240; // 4 minutes in seconds
+    const oneMinuteInSeconds = 60;
+    const oneMinuteLineX =
+      priceLineX +
+      (oneMinuteInSeconds / timeWindow) * (availableWidth - priceLineX);
+    const oneMinuteLineXAbsolute = priceCanvasOffset + oneMinuteLineX;
+
+    return { referenceLineX, oneMinuteLineX: oneMinuteLineXAbsolute };
+  }, [containerWidth]);
+
+  // Calculate horizontal grid line positions (matching PriceCanvas grid)
+  const horizontalLinePositions = useMemo(() => {
+    const timelineHeight = 144; // 9rem (bottom-36) in pixels
+    const canvasHeight = containerHeight - timelineHeight;
+
+    // Calculate 15 horizontal lines (matching PriceCanvas grid)
+    const lines: number[] = [];
+    for (let i = 0; i <= 15; i++) {
+      const y = (canvasHeight / 15) * i;
+      lines.push(y);
+    }
+
+    return lines;
+  }, [containerHeight]);
+
+  // Calculate NOW position for timeline markers (matching Timeline component)
+  const nowPixelPosition = useMemo(() => {
+    const priceCanvasOffset = 112; // 7rem in pixels
+    const availableWidth = containerWidth - priceCanvasOffset;
+    return (
+      priceCanvasOffset +
+      (CURRENT_TIME_POSITION / 100) * availableWidth +
+      TIMELINE_POSITION_OFFSET
+    );
+  }, [containerWidth]);
+
+  // Calculate scroll offset for timeline markers (matching Timeline component)
+  const timelineScrollOffset = useMemo(() => {
+    const now = currentTime + viewOffset * 1000;
+    const timeSinceStart = (now - startTimeRef.current) / 1000;
+    return -timeSinceStart * TIMELINE_SCROLL_SPEED;
+  }, [currentTime, viewOffset]);
+
+  // Generate time markers at 60-second intervals (matching Timeline component)
+  const timelineMarkers = useMemo(() => {
+    const markers: Array<{ time: number; xPosition: number }> = [];
+    const now = currentTime + viewOffset * 1000;
+    const timeRangeMinutes =
+      Math.ceil(containerWidth / (TIMELINE_SCROLL_SPEED * 60)) + 15;
+    const rangeStart = now - timeRangeMinutes * 60 * 1000;
+    const rangeEnd = now + timeRangeMinutes * 60 * 1000;
+
+    let markerTime =
+      Math.floor(rangeStart / (GRID_INTERVAL_SECONDS * 1000)) *
+      (GRID_INTERVAL_SECONDS * 1000);
+    let lastVisiblePosition = -Infinity;
+
+    while (markerTime <= rangeEnd) {
+      const timeDiff = (markerTime - now) / 1000;
+      const xPosition = nowPixelPosition + timeDiff * TIMELINE_SCROLL_SPEED;
+      const adjustedPosition = xPosition + timelineScrollOffset;
+
+      const isInVisibleRange =
+        adjustedPosition >= -20 && adjustedPosition <= containerWidth + 20;
+      const hasEnoughSpacing =
+        markers.length === 0 ||
+        Math.abs(adjustedPosition - lastVisiblePosition) >=
+          TIMELINE_MIN_SPACING;
+
+      if (isInVisibleRange && hasEnoughSpacing) {
+        markers.push({ time: markerTime, xPosition });
+        lastVisiblePosition = adjustedPosition;
+      }
+
+      markerTime += GRID_INTERVAL_SECONDS * 1000;
+    }
+
+    return markers;
+  }, [
+    currentTime,
+    viewOffset,
+    containerWidth,
+    timelineScrollOffset,
+    nowPixelPosition,
+  ]);
+
+  // Initialize and update start time for timeline (matching Timeline component)
+  useEffect(() => {
+    if (viewOffset === 0) {
+      startTimeRef.current = currentTime;
+    }
+  }, [viewOffset, currentTime]);
+
+  // Initialize start time on mount
+  useEffect(() => {
+    startTimeRef.current = currentTime;
+  }, [currentTime]);
+
   // Update current time continuously for smooth timeline scrolling
   useEffect(() => {
     let animationFrameId: number;
@@ -74,7 +204,10 @@ export function GameView({ market, userBet }: GameViewProps) {
   }, []);
 
   return (
-    <div className="relative w-full h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black overflow-hidden border-0">
+    <div
+      ref={containerRef}
+      className="relative w-full h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black overflow-hidden border-0"
+    >
       {/* Grid overlay */}
       <div
         className="absolute inset-0 opacity-10"
@@ -87,6 +220,84 @@ export function GameView({ market, userBet }: GameViewProps) {
         }}
       />
 
+      {/* Full-screen vertical and horizontal reference lines */}
+      <div className="absolute inset-0 pointer-events-none z-[5]">
+        {/* Horizontal grid lines - extending full screen width */}
+        {horizontalLinePositions.map((y, index) => (
+          <div
+            key={`horizontal-${index}`}
+            className="absolute left-0 right-0 h-[1px]"
+            style={{
+              top: `${y}px`,
+              backgroundColor: "rgba(251, 146, 60, 0.08)",
+            }}
+          />
+        ))}
+
+        {/* Full-screen timeline markers - extending from top to bottom */}
+        <div
+          className="absolute top-0 bottom-0 left-0 right-0"
+          style={{
+            transform: `translateX(${timelineScrollOffset}px)`,
+            willChange: "transform",
+          }}
+        >
+          {timelineMarkers
+            .filter((marker) => {
+              const adjustedPosition = marker.xPosition + timelineScrollOffset;
+              // Only show markers to the right of the live price line
+              // Add small threshold to account for line width
+              return adjustedPosition > nowPixelPosition + 2;
+            })
+            .map((marker) => {
+              const adjustedPosition = marker.xPosition + timelineScrollOffset;
+              const isAtCurrentPosition =
+                Math.abs(adjustedPosition - nowPixelPosition) < 60;
+
+              return (
+                <div
+                  key={`timeline-marker-${marker.time}`}
+                  className="absolute top-0 bottom-0"
+                  style={{
+                    left: `${marker.xPosition}px`,
+                    transform: "translateX(-50%)",
+                    width: "1px",
+                  }}
+                >
+                  <div
+                    className={`absolute top-0 bottom-0 ${
+                      isAtCurrentPosition
+                        ? "w-[0.5px] bg-orange-500/40"
+                        : "w-[0.5px] bg-orange-500/15"
+                    }`}
+                  />
+                </div>
+              );
+            })}
+        </div>
+
+        {/* First vertical reference line */}
+        <div
+          className="absolute top-0 bottom-0 w-[2.5px]"
+          style={{
+            left: `${verticalLinePositions.referenceLineX}px`,
+            transform: "translateX(-50%)",
+            background:
+              "repeating-linear-gradient(to bottom, rgba(251, 146, 60, 0.4) 0px, rgba(251, 146, 60, 0.4) 3px, transparent 3px, transparent 6px)",
+          }}
+        />
+        {/* Second vertical reference line */}
+        <div
+          className="absolute top-0 bottom-0 w-[2.5px]"
+          style={{
+            left: `${verticalLinePositions.oneMinuteLineX}px`,
+            transform: "translateX(-50%)",
+            background:
+              "repeating-linear-gradient(to bottom, rgba(251, 146, 60, 0.4) 0px, rgba(251, 146, 60, 0.4) 3px, transparent 3px, transparent 6px)",
+          }}
+        />
+      </div>
+
       {/* Left price scale */}
       <PriceScale currentPrice={currentPrice} />
 
@@ -98,10 +309,34 @@ export function GameView({ market, userBet }: GameViewProps) {
           currentTime={currentTime}
           priceScale={priceScale}
         />
+        {/* Live time at orange line intersection - professional styling */}
+        <div
+          className="absolute bottom-0 z-30"
+          style={{
+            left: "30%",
+            transform: "translateX(-50%)",
+          }}
+        >
+          <div className="bg-black/95 backdrop-blur-sm px-2.5 py-1.5 rounded-md border border-orange-500/50 shadow-lg">
+            <div className="text-[10px] font-mono text-orange-300 font-bold whitespace-nowrap">
+              {(() => {
+                const date = new Date(currentTime);
+                const hours = String(date.getHours()).padStart(2, "0");
+                const minutes = String(date.getMinutes()).padStart(2, "0");
+                const seconds = String(date.getSeconds()).padStart(2, "0");
+                return `${hours}:${minutes}:${seconds}`;
+              })()}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Timeline component */}
-      <Timeline currentTime={currentTime} />
+      <Timeline
+        currentTime={currentTime}
+        viewOffset={viewOffset}
+        onViewOffsetChange={setViewOffset}
+      />
 
       {/* HUD Elements */}
       <div className="absolute top-4 sm:top-6 left-28 right-4 sm:right-6 flex items-center justify-start z-20">

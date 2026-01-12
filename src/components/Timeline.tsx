@@ -1,195 +1,196 @@
 // Timeline component for displaying time markers
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 
 interface TimelineProps {
   currentTime: number;
+  viewOffset?: number;
+  onViewOffsetChange?: (offset: number) => void;
 }
 
 // Constants
-const CURRENT_TIME_POSITION = 30; // Percentage from left
-const TIME_WINDOW_SECONDS = 240; // 4 minutes
-const GRID_INTERVAL_SECONDS = 30; // Grid marks every 30 seconds
+const CURRENT_TIME_POSITION = 30; // Percentage from left (fixed NOW position)
+const GRID_INTERVAL_SECONDS = 60; // Grid marks every 60 seconds (1 minute)
 
-// Helper functions
-function formatTime(timestamp: number): string {
-  const date = new Date(timestamp);
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  return `${hours}:${minutes}:${seconds}`;
-}
+// ============================================
+// TIMELINE CONFIGURATION
+// ============================================
+// 1. TIMELINE_SCROLL_SPEED: Controls how fast the timeline scrolls
+//    - 1 minute = 120 pixels (2 pixels/second × 60 seconds)
+//    - This ensures proper spacing and smooth scrolling
+const TIMELINE_SCROLL_SPEED = 2; // Pixels per second
 
-export function Timeline({ currentTime }: TimelineProps) {
-  const [viewOffset, setViewOffset] = useState(0); // Offset in seconds for navigation
+// 2. TIMELINE_POSITION_OFFSET: Fine-tune alignment with NOW indicator
+//    - Adjusts horizontal position to match PriceCanvas NOW line exactly
+const TIMELINE_POSITION_OFFSET = 0; // Pixels (aligned with canvas)
 
-  // Display time formatted from currentTime
-  const displayTime = useMemo(
-    () => formatTime(currentTime),
-    [Math.floor(currentTime / 1000)]
-  );
+// 3. TIMELINE_MIN_SPACING: Minimum pixel spacing between visible time markers
+//    - 60 seconds = 120 pixels, so we use 110px to show all markers with slight buffer
+const TIMELINE_MIN_SPACING = 110; // Pixels
 
-  // Calculate time markers that flow from right to left
-  const timeMarkers = useMemo(() => {
-    const markers: Array<{ time: number; position: number }> = [];
-    const now = currentTime + viewOffset * 1000;
+export function Timeline({
+  currentTime,
+  viewOffset: externalViewOffset,
+  onViewOffsetChange,
+}: TimelineProps) {
+  const [internalViewOffset, setInternalViewOffset] = useState(0);
+  const viewOffset =
+    externalViewOffset !== undefined ? externalViewOffset : internalViewOffset;
+  const setViewOffset = onViewOffsetChange || setInternalViewOffset;
+  const [containerWidth, setContainerWidth] = useState(1920);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const startTimeRef = useRef<number>(currentTime);
 
-    // Show 4 minutes of history before current time (0% to 30%)
-    // Show 4 minutes of future after current time (30% to 100%)
-    const pastSeconds = (CURRENT_TIME_POSITION / 100) * TIME_WINDOW_SECONDS; // ~72 seconds
-    const futureSeconds =
-      ((100 - CURRENT_TIME_POSITION) / 100) * TIME_WINDOW_SECONDS; // ~168 seconds
-
-    const startTime = now - pastSeconds * 1000;
-    const endTime = now + futureSeconds * 1000;
-
-    // Generate markers every 30 seconds
-    let markerTime = startTime;
-    while (markerTime <= endTime) {
-      const timeDiff = (markerTime - now) / 1000; // seconds from now
-      let position: number;
-
-      if (timeDiff <= 0) {
-        // Past: 0% to 30%
-        position =
-          CURRENT_TIME_POSITION +
-          (timeDiff / pastSeconds) * CURRENT_TIME_POSITION;
-      } else {
-        // Future: 30% to 100%
-        position =
-          CURRENT_TIME_POSITION +
-          (timeDiff / futureSeconds) * (100 - CURRENT_TIME_POSITION);
+  // Update container width on mount and resize
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
       }
+    };
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, []);
 
-      position = Math.max(0, Math.min(100, position));
-      markers.push({ time: markerTime, position });
+  // Calculate NOW position (reused in multiple places)
+  const nowPixelPosition = useMemo(() => {
+    const priceCanvasOffset = 112; // 7rem in pixels
+    const availableWidth = containerWidth - priceCanvasOffset;
+    return (
+      priceCanvasOffset +
+      (CURRENT_TIME_POSITION / 100) * availableWidth +
+      TIMELINE_POSITION_OFFSET
+    );
+  }, [containerWidth]);
+
+  // Calculate scroll offset based on time progression
+  const scrollOffset = useMemo(() => {
+    const now = currentTime + viewOffset * 1000;
+    const timeSinceStart = (now - startTimeRef.current) / 1000;
+    return -timeSinceStart * TIMELINE_SCROLL_SPEED;
+  }, [currentTime, viewOffset]);
+
+  // Generate time markers at 60-second intervals
+  const timeMarkers = useMemo(() => {
+    const markers: Array<{ time: number; xPosition: number }> = [];
+    const now = currentTime + viewOffset * 1000;
+    const timeRangeMinutes =
+      Math.ceil(containerWidth / (TIMELINE_SCROLL_SPEED * 60)) + 15;
+    const rangeStart = now - timeRangeMinutes * 60 * 1000;
+    const rangeEnd = now + timeRangeMinutes * 60 * 1000;
+
+    let markerTime =
+      Math.floor(rangeStart / (GRID_INTERVAL_SECONDS * 1000)) *
+      (GRID_INTERVAL_SECONDS * 1000);
+    let lastVisiblePosition = -Infinity;
+
+    while (markerTime <= rangeEnd) {
+      const timeDiff = (markerTime - now) / 1000;
+      const xPosition = nowPixelPosition + timeDiff * TIMELINE_SCROLL_SPEED;
+      const adjustedPosition = xPosition + scrollOffset;
+
+      const isInVisibleRange =
+        adjustedPosition >= -20 && adjustedPosition <= containerWidth + 20;
+      const hasEnoughSpacing =
+        markers.length === 0 ||
+        Math.abs(adjustedPosition - lastVisiblePosition) >=
+          TIMELINE_MIN_SPACING;
+
+      if (isInVisibleRange && hasEnoughSpacing) {
+        markers.push({ time: markerTime, xPosition });
+        lastVisiblePosition = adjustedPosition;
+      }
 
       markerTime += GRID_INTERVAL_SECONDS * 1000;
     }
 
     return markers;
-  }, [currentTime, viewOffset]);
+  }, [currentTime, viewOffset, containerWidth, scrollOffset, nowPixelPosition]);
+
+  // Initialize and update start time
+  useEffect(() => {
+    if (viewOffset === 0) {
+      startTimeRef.current = currentTime;
+    }
+  }, [viewOffset, currentTime]);
+
+  // Initialize start time on mount
+  useEffect(() => {
+    startTimeRef.current = currentTime;
+  }, [currentTime]);
 
   // Navigation handlers
   const handleForward = () => {
-    setViewOffset((prev) => prev + 30); // Move forward 30 seconds
+    const newOffset = viewOffset + 60;
+    setViewOffset(newOffset); // Move forward 1 minute
+    startTimeRef.current = currentTime + newOffset * 1000;
   };
 
   const handleBack = () => {
-    setViewOffset((prev) => prev - 30); // Move back 30 seconds
+    const newOffset = viewOffset - 60;
+    setViewOffset(newOffset); // Move back 1 minute
+    startTimeRef.current = currentTime + newOffset * 1000;
   };
 
   const handleReset = () => {
     setViewOffset(0); // Reset to live time
+    startTimeRef.current = currentTime;
   };
 
   return (
     <div className="absolute bottom-0 left-0 right-0 h-36 border-t border-orange-500/30 bg-gradient-to-t from-black/95 via-black/80 to-black/40 z-30 overflow-hidden">
-      <div className="relative w-full h-full">
-        {/* Background grid lines */}
-        <div className="absolute top-0 left-0 right-0 h-full pointer-events-none">
-          {Array.from({ length: 11 }, (_, i) => (
-            <div
-              key={i}
-              className="absolute top-0 bottom-0 w-[0.5px] bg-orange-500/8"
-              style={{ left: `${i * 10}%` }}
-            />
-          ))}
-        </div>
+      <div ref={containerRef} className="relative w-full h-full">
+        {/* Background grid lines removed - only show timeline markers */}
 
-        {/* Time markers flowing from right to left */}
-        <div className="absolute top-0 left-0 right-0 h-full pointer-events-none z-20">
-          {timeMarkers.map((marker, index) => {
-            const isCurrentTime = Math.abs(marker.time - currentTime) < 1000;
+        {/* Scrolling time markers container */}
+        <div
+          className="absolute top-0 left-0 right-0 h-full pointer-events-none z-20"
+          style={{
+            transform: `translateX(${scrollOffset}px)`,
+            willChange: "transform",
+          }}
+        >
+          {timeMarkers.map((marker) => {
+            const adjustedPosition = marker.xPosition + scrollOffset;
             const isAtCurrentPosition =
-              Math.abs(marker.position - CURRENT_TIME_POSITION) < 2;
+              Math.abs(adjustedPosition - nowPixelPosition) < 60;
 
             return (
               <div
-                key={`marker-${index}-${marker.position}`}
+                key={`marker-${marker.time}`}
                 className="absolute flex flex-col items-center"
                 style={{
-                  left: `${marker.position}%`,
+                  left: `${marker.xPosition}px`,
                   top: 0,
                   bottom: 0,
                   transform: "translateX(-50%)",
                   width: "1px",
                 }}
               >
-                {/* Vertical grid line below live time */}
                 <div
-                  className={`absolute top-0 bottom-0 w-[0.5px] ${
+                  className={`absolute top-0 bottom-0 ${
                     isAtCurrentPosition
-                      ? "bg-orange-500/40"
-                      : "bg-orange-500/15"
+                      ? "w-[0.5px] bg-orange-500/40"
+                      : "w-[0.5px] bg-orange-500/15"
                   }`}
                 />
-                {/* Time label - positioned in upper-middle area of timeline */}
-                <div
-                  className={`absolute text-[10px] font-mono ${
-                    isCurrentTime
-                      ? "text-orange-400 font-bold"
-                      : "text-orange-400/90"
-                  } bg-black/95 px-2 py-1 rounded border border-orange-500/40 whitespace-nowrap z-30`}
-                  style={{
-                    top: "20px",
-                    textShadow:
-                      "0 0 6px rgba(0, 0, 0, 1), 0 0 3px rgba(251, 146, 60, 0.5)",
-                    minWidth: "65px",
-                    textAlign: "center",
-                    opacity: 1,
-                  }}
-                >
-                  {formatTime(marker.time)}
-                </div>
               </div>
             );
           })}
         </div>
 
-        {/* NOW indicator with live time - aligned with price line at 30% of canvas */}
-        <div
-          className="absolute flex flex-col items-center z-50 pointer-events-none"
-          style={{
-            left: `calc(7rem + ${CURRENT_TIME_POSITION}% * (100% - 7rem))`,
-            top: 0,
-            transform: "translateX(-50%)",
-          }}
-        >
-          {/* NOW text above the time line */}
-          <div
-            className="text-[10px] font-mono text-orange-400 font-bold bg-black/97 px-3 py-1.5 rounded-lg whitespace-nowrap mb-1"
-            style={{ marginTop: "4px" }}
-          >
-            NOW
-          </div>
-          {/* Live time label - aligned with other time markers */}
-          <div
-            className="text-[10px] font-mono text-orange-400 font-bold bg-black/95 px-2 py-1 rounded border border-orange-500/40 whitespace-nowrap"
-            style={{
-              top: "20px",
-              position: "absolute",
-              textShadow:
-                "0 0 6px rgba(0, 0, 0, 1), 0 0 3px rgba(251, 146, 60, 0.5)",
-              minWidth: "65px",
-              textAlign: "center",
-            }}
-          >
-            {displayTime}
-          </div>
-        </div>
-
-        {/* Navigation controls */}
-        <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex items-center gap-2 z-40 pointer-events-auto">
+        {/* Navigation controls - professional styling */}
+        <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex items-center gap-2 z-40 pointer-events-auto">
           <button
             onClick={handleBack}
-            className="px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 rounded-lg text-orange-400 text-[10px] font-mono font-semibold transition-colors"
-            title="Go back 30 seconds"
+            className="px-3 py-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-orange-500/40 hover:border-orange-500/60 rounded-md text-orange-400 text-[10px] font-mono font-semibold transition-all duration-200 shadow-lg"
+            title="Go back 1 minute"
           >
             ← BACK
           </button>
           <button
             onClick={handleReset}
-            className="px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 rounded-lg text-orange-400 text-[10px] font-mono font-semibold transition-colors"
+            className="px-3 py-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-orange-500/40 hover:border-orange-500/60 rounded-md text-orange-400 text-[10px] font-mono font-semibold transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             title="Reset to live time"
             disabled={viewOffset === 0}
           >
@@ -197,8 +198,8 @@ export function Timeline({ currentTime }: TimelineProps) {
           </button>
           <button
             onClick={handleForward}
-            className="px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 rounded-lg text-orange-400 text-[10px] font-mono font-semibold transition-colors"
-            title="Go forward 30 seconds"
+            className="px-3 py-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-orange-500/40 hover:border-orange-500/60 rounded-md text-orange-400 text-[10px] font-mono font-semibold transition-all duration-200 shadow-lg"
+            title="Go forward 1 minute"
           >
             FORWARD →
           </button>
