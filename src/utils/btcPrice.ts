@@ -133,3 +133,37 @@ function connectWebSocket() {
 export function getCurrentBTCPrice(): number | null {
   return currentPrice;
 }
+
+/**
+ * Fetch initial BTC price from Binance REST API
+ * Used on page load/refresh to get the live price immediately
+ */
+export async function fetchInitialBTCPrice(): Promise<number> {
+  try {
+    const response = await fetch(
+      "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+    );
+    const data = await response.json();
+    const price = parseFloat(data.price);
+    
+    if (!isNaN(price) && price > 0) {
+      currentPrice = price;
+      // Notify all subscribers immediately
+      subscribers.forEach((callback) => {
+        try {
+          callback(price);
+        } catch (err) {
+          // Silent error
+        }
+      });
+      return price;
+    }
+    throw new Error("Invalid price from API");
+  } catch (error) {
+    // Fallback: return last known price or throw
+    if (currentPrice !== null) {
+      return currentPrice;
+    }
+    throw error;
+  }
+}

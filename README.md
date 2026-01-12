@@ -31,9 +31,21 @@ Users predict whether BTC price will be **ABOVE** or **BELOW** a target price at
 - ✅ **Real-time Price Chart**: Live BTC price visualization with smooth animations
 - ✅ **Price Canvas**: Interactive canvas showing price history with stable, smooth line rendering
 - ✅ **Timeline Component**: Scrolling timeline with time markers and "NOW" indicator
-- ✅ **Price Scale**: Left-side price scale with $10 increments
+- ✅ **Price Scale**: Left-side price scale with $10 increments, fixed range based on initial live price
+- ✅ **Betting Blocks**: Interactive rectangular boxes (betting blocks) that move right to left
+  - ✅ **Box Grid**: 15 rows of betting blocks aligned with price levels ($10 increments)
+  - ✅ **Movement**: Smooth right-to-left scrolling synchronized with timeline
+  - ✅ **Vanishing Logic**: Boxes disappear instantly when left edge touches live price line
+  - ✅ **Spacing**: Proper spacing maintained (85% of timeline spacing) to prevent overlap
+  - ✅ **Interactive**: Clickable boxes with hover effects (scale, glow, border highlight)
+  - ✅ **Price Mapping**: Each box row mapped to specific price level for betting logic
+- ✅ **Fixed Price Scale**: Price scale centered on initial live price from Binance (no auto-rebalancing)
+  - ✅ **Initial Price Fetch**: Fetches live BTC price from Binance REST API on page load/refresh
+  - ✅ **Fixed Range**: ±$70 range ($10 increments, 7 levels above/below) centered on initial price
+  - ✅ **Alignment**: Ensures betting blocks align correctly with price levels
 - ✅ **Betting Panel**: Integrated betting interface with claim rewards functionality
 - ✅ **HUD Elements**: Current price display with Binance badge, user bet status
+- ✅ **Live Price Line**: Vertical dashed line at 30% from left showing current time/price position
 
 ### UI Components
 
@@ -58,6 +70,7 @@ Users predict whether BTC price will be **ABOVE** or **BELOW** a target price at
 - ✅ **Chain Management**: Microchain ID stored and displayed
 - ✅ **State Management**: Zustand for persistent wallet state
 - ✅ **Real-time Price**: Binance WebSocket for live BTC/USDT price updates
+- ✅ **Initial Price Fetch**: Binance REST API (`/api/v3/ticker/price?symbol=BTCUSDT`) for initial price on load
 
 ## 📦 Installation
 
@@ -109,6 +122,36 @@ src/
 - **Import/Export**: Full wallet backup including microchain ID
 - **Verification**: Address validated against private key
 - **Progress UI**: Real-time step-by-step wallet creation feedback
+
+## 🎮 Game Mechanics
+
+### Betting Blocks System
+
+- **Box Grid**: 15 horizontal rows of betting blocks, each row representing a $10 price increment
+- **Price Levels**: Each box is mapped to a specific price level (stored in `data-price-level` attribute)
+- **Movement**: Boxes scroll smoothly from right to left at 2 pixels/second
+- **Vanishing**: Boxes disappear instantly when their left edge touches the live price line
+- **Spacing**: Boxes maintain proper spacing (85% of 110px = ~93.5px width) to prevent overlap
+- **Interactivity**: 
+  - Hover effects: Scale up, brighter border, enhanced glow
+  - Clickable: Ready for betting logic integration
+  - Visual feedback: Gradient opacity based on distance from live price line
+
+### Price Scale System
+
+- **Fixed Range**: Price scale is fixed based on initial live price from Binance
+- **No Auto-rebalancing**: Scale stays centered on initial price to ensure betting blocks align correctly
+- **Price Levels**: 15 levels total (±$70 from center, $10 increments)
+- **Initialization**: Fetches live price on page load/refresh and centers scale on that price
+- **Alignment**: Betting blocks perfectly align with price scale levels
+
+### Timeline & Movement
+
+- **Smooth Scrolling**: Uses `requestAnimationFrame` for 60fps smooth movement
+- **Time Markers**: Generated at 60-second intervals
+- **Live Price Line**: Vertical dashed line at 30% from left showing current time position
+- **No Bets Zone**: Area between live price line and 1-minute future line (no betting allowed)
+- **Synchronization**: All boxes move in sync with timeline scroll offset
 
 ## ⚠️ Known Limitations
 

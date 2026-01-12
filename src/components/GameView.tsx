@@ -1,7 +1,7 @@
 // Futuristic crypto prediction game interface
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Market, BetDirection } from "../types";
-import { subscribeToBTCPrice } from "../utils/btcPrice";
+import { subscribeToBTCPrice, fetchInitialBTCPrice } from "../utils/btcPrice";
 import { Timeline } from "./Timeline";
 import { PriceCanvas } from "./PriceCanvas";
 import { PriceScale } from "./PriceScale";
@@ -31,10 +31,13 @@ export function GameView({ market, userBet }: GameViewProps) {
   const [viewOffset, setViewOffset] = useState(0); // Timeline navigation offset
   const containerRef = useRef<HTMLDivElement>(null);
   const startTimeRef = useRef<number>(Date.now());
+  // Store initial live price for fixed price scale (centered on this price)
+  const [initialLivePrice, setInitialLivePrice] = useState<number | null>(null);
+
   const priceScale = usePriceScale(
     priceHistory,
     currentPrice,
-    market.targetPrice
+    initialLivePrice ?? market.targetPrice
   );
 
   // Timeline constants (matching Timeline component)
@@ -44,25 +47,55 @@ export function GameView({ market, userBet }: GameViewProps) {
   const TIMELINE_POSITION_OFFSET = 0;
   const TIMELINE_MIN_SPACING = 110; // Pixels
 
-  // Subscribe to real-time BTC price
+  // Fetch initial live price from Binance on mount/refresh and set up price scale
   useEffect(() => {
-    const initialPrice = market.targetPrice;
-    setCurrentPrice(initialPrice);
-    const now = Date.now();
-    setPriceHistory([{ price: initialPrice, timestamp: now }]);
+    let isMounted = true;
 
+    const initializePrice = async () => {
+      try {
+        // Fetch live price from Binance REST API
+        const livePrice = await fetchInitialBTCPrice();
+
+        if (isMounted) {
+          // Store initial live price for fixed price scale (centered on this)
+          setInitialLivePrice(livePrice);
+          setCurrentPrice(livePrice);
+          const now = Date.now();
+          setPriceHistory([{ price: livePrice, timestamp: now }]);
+        }
+      } catch (error) {
+        // Fallback to market.targetPrice if fetch fails
+        console.warn(
+          "Failed to fetch initial price, using target price:",
+          error
+        );
+        if (isMounted) {
+          setInitialLivePrice(market.targetPrice);
+          setCurrentPrice(market.targetPrice);
+          const now = Date.now();
+          setPriceHistory([{ price: market.targetPrice, timestamp: now }]);
+        }
+      }
+    };
+
+    initializePrice();
+
+    // Subscribe to real-time BTC price updates
     const unsubscribe = subscribeToBTCPrice((price) => {
-      const timestamp = Date.now();
-      setCurrentPrice(price);
-      setPriceHistory((prev) => {
-        // Keep only last 10 minutes of history to prevent memory issues
-        const tenMinutesAgo = timestamp - 10 * 60 * 1000;
-        const filtered = prev.filter((p) => p.timestamp >= tenMinutesAgo);
-        return [...filtered, { price, timestamp }];
-      });
+      if (isMounted) {
+        const timestamp = Date.now();
+        setCurrentPrice(price);
+        setPriceHistory((prev) => {
+          // Keep only last 10 minutes of history to prevent memory issues
+          const tenMinutesAgo = timestamp - 10 * 60 * 1000;
+          const filtered = prev.filter((p) => p.timestamp >= tenMinutesAgo);
+          return [...filtered, { price, timestamp }];
+        });
+      }
     });
 
     return () => {
+      isMounted = false;
       unsubscribe();
     };
   }, [market.targetPrice]);
@@ -111,6 +144,26 @@ export function GameView({ market, userBet }: GameViewProps) {
 
     return lines;
   }, [containerHeight]);
+
+  // Calculate price level for each row (for betting blocks)
+  // Each row represents a $10 price increment
+  // Use initial live price (or target price as fallback) for fixed scale
+  const priceLevelsPerRow = useMemo(() => {
+    const basePrice = initialLivePrice ?? market.targetPrice;
+    const roundedBasePrice = Math.round(basePrice / 10) * 10;
+    const numIncrements = 7; // 7 increments above and below = 15 total levels
+    const priceIncrement = 10;
+
+    // Calculate price for each row (15 rows, highest at top)
+    const prices: number[] = [];
+    for (let i = 0; i < 15; i++) {
+      // Row 0 = highest price, Row 14 = lowest price
+      const price = roundedBasePrice + (numIncrements - i) * priceIncrement;
+      prices.push(price);
+    }
+
+    return prices;
+  }, [market.targetPrice, initialLivePrice]);
 
   // Calculate NOW position for timeline markers (matching Timeline component)
   const nowPixelPosition = useMemo(() => {
@@ -234,46 +287,103 @@ export function GameView({ market, userBet }: GameViewProps) {
           />
         ))}
 
-        {/* Full-screen timeline markers - extending from top to bottom */}
+        {/* Box grid - rows of boxes moving right to left */}
         <div
-          className="absolute top-0 bottom-0 left-0 right-0"
+          className="absolute top-0 bottom-0 left-0 right-0 pointer-events-auto"
           style={{
             transform: `translateX(${timelineScrollOffset}px)`,
             willChange: "transform",
           }}
         >
-          {timelineMarkers
-            .filter((marker) => {
-              const adjustedPosition = marker.xPosition + timelineScrollOffset;
-              // Only show markers to the right of the live price line
-              // Add small threshold to account for line width
-              return adjustedPosition > nowPixelPosition + 2;
-            })
-            .map((marker) => {
-              const adjustedPosition = marker.xPosition + timelineScrollOffset;
-              const isAtCurrentPosition =
-                Math.abs(adjustedPosition - nowPixelPosition) < 60;
+          {horizontalLinePositions.slice(0, -1).map((y, rowIndex) => {
+            const rowHeight = horizontalLinePositions[rowIndex + 1] - y;
+            // Box height should fit within row height with padding
+            const boxHeight = rowHeight - 4;
+            // Box width should be smaller than spacing to prevent overlap
+            // Use 85% of spacing to ensure proper gaps between boxes
+            const maxBoxWidth = TIMELINE_MIN_SPACING * 0.85;
+            const boxWidth = Math.min(boxHeight * 1.8, maxBoxWidth);
 
-              return (
-                <div
-                  key={`timeline-marker-${marker.time}`}
-                  className="absolute top-0 bottom-0"
-                  style={{
-                    left: `${marker.xPosition}px`,
-                    transform: "translateX(-50%)",
-                    width: "1px",
-                  }}
-                >
-                  <div
-                    className={`absolute top-0 bottom-0 ${
-                      isAtCurrentPosition
-                        ? "w-[0.5px] bg-orange-500/40"
-                        : "w-[0.5px] bg-orange-500/15"
-                    }`}
-                  />
-                </div>
-              );
-            })}
+            return (
+              <div
+                key={`box-row-${rowIndex}`}
+                className="absolute left-0 right-0"
+                style={{
+                  top: `${y + 2}px`,
+                  height: `${rowHeight - 4}px`,
+                }}
+              >
+                {timelineMarkers
+                  .filter((marker) => {
+                    const adjustedPosition =
+                      marker.xPosition + timelineScrollOffset;
+                    // Box disappears when its left edge touches the live price line
+                    // adjustedPosition is center of box, left edge is at adjustedPosition - boxWidth/2
+                    // We want to show boxes whose left edge hasn't reached the line yet
+                    // Show when: left edge > nowPixelPosition
+                    const leftEdge = adjustedPosition - boxWidth / 2;
+                    return leftEdge > nowPixelPosition;
+                  })
+                  .map((marker) => {
+                    const adjustedPosition =
+                      marker.xPosition + timelineScrollOffset;
+
+                    // Calculate gradient opacity based on distance from live price line
+                    // Closer to live price = brighter, further = darker
+                    const distanceFromLivePrice =
+                      adjustedPosition - nowPixelPosition;
+                    const maxDistance = containerWidth - nowPixelPosition;
+                    const opacityFactor = Math.max(
+                      0,
+                      1 - (distanceFromLivePrice / maxDistance) * 0.7
+                    );
+                    const borderOpacity = 0.5 + opacityFactor * 0.3; // 0.5 to 0.8 (more visible)
+                    const bgOpacity = 0.05 + opacityFactor * 0.1; // Subtle background glow
+
+                    const priceLevel = priceLevelsPerRow[rowIndex];
+
+                    return (
+                      <div
+                        key={`box-${rowIndex}-${marker.time}`}
+                        className="absolute rounded-md border cursor-pointer hover:scale-105 hover:shadow-lg hover:shadow-orange-500/30"
+                        data-price-level={priceLevel}
+                        data-timestamp={marker.time}
+                        style={{
+                          left: `${marker.xPosition}px`,
+                          top: `${(rowHeight - boxHeight) / 2 - 2}px`,
+                          width: `${boxWidth}px`,
+                          height: `${boxHeight}px`,
+                          transform: "translateX(-50%)",
+                          borderColor: `rgba(251, 146, 60, ${borderOpacity})`,
+                          borderWidth: "1.5px",
+                          backgroundColor: `rgba(251, 146, 60, ${bgOpacity})`,
+                          boxShadow: `0 0 ${
+                            8 + opacityFactor * 4
+                          }px rgba(251, 146, 60, ${0.2 + opacityFactor * 0.2})`,
+                          transition:
+                            "transform 0.15s ease-out, box-shadow 0.15s ease-out",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor =
+                            "rgba(251, 146, 60, 1)";
+                          e.currentTarget.style.backgroundColor =
+                            "rgba(251, 146, 60, 0.15)";
+                          e.currentTarget.style.boxShadow =
+                            "0 0 12px rgba(251, 146, 60, 0.5)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = `rgba(251, 146, 60, ${borderOpacity})`;
+                          e.currentTarget.style.backgroundColor = `rgba(251, 146, 60, ${bgOpacity})`;
+                          e.currentTarget.style.boxShadow = `0 0 ${
+                            8 + opacityFactor * 4
+                          }px rgba(251, 146, 60, ${0.2 + opacityFactor * 0.2})`;
+                        }}
+                      />
+                    );
+                  })}
+              </div>
+            );
+          })}
         </div>
 
         {/* First vertical reference line */}
@@ -299,7 +409,10 @@ export function GameView({ market, userBet }: GameViewProps) {
       </div>
 
       {/* Left price scale */}
-      <PriceScale currentPrice={currentPrice} />
+      <PriceScale
+        currentPrice={currentPrice}
+        targetPrice={initialLivePrice ?? market.targetPrice}
+      />
 
       {/* Price line canvas */}
       <div className="absolute left-28 right-0 top-0 bottom-36">

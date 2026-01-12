@@ -1,13 +1,16 @@
 // Price scale component for left side display
 interface PriceScaleProps {
   currentPrice: number;
+  targetPrice?: number; // Optional target price for fixed range
 }
 
-export function PriceScale({ currentPrice }: PriceScaleProps) {
-  // Calculate price scale with $10 increments
-  const roundedCurrentPrice = Math.round(currentPrice / 10) * 10;
+export function PriceScale({ currentPrice, targetPrice }: PriceScaleProps) {
+  // Use fixed price range based on target price (or initial currentPrice)
+  // This ensures boxes stay aligned with price levels
+  const basePrice = targetPrice ?? currentPrice;
+  const roundedBasePrice = Math.round(basePrice / 10) * 10;
   const numIncrements = 7; // 7 increments above and below = 15 total sections
-  const startPrice = roundedCurrentPrice - numIncrements * 10;
+  const startPrice = roundedBasePrice - numIncrements * 10;
 
   // Generate prices with $10 gaps
   const prices: number[] = [];

@@ -80,12 +80,9 @@ export function PriceCanvas({
       // Center X position - 30% from left (matches Timeline CURRENT_TIME_POSITION)
       const priceLineX = canvas.width * 0.3;
 
-      // Calculate price scale for canvas drawing
-      const roundedCurrentPrice = Math.round(currentPrice / 10) * 10;
-      const numIncrements = 7;
-      const canvasMinPrice = roundedCurrentPrice - numIncrements * 10;
-      const canvasMaxPrice = roundedCurrentPrice + numIncrements * 10;
-      const canvasPriceRange = canvasMaxPrice - canvasMinPrice;
+      // Use fixed price scale from props (no auto-centering for betting blocks)
+      const canvasMinPrice = priceScale.minPrice;
+      const canvasPriceRange = priceScale.priceRange;
 
       const now = currentTime;
       const timeWindow = 240 * 1000; // 4 minutes

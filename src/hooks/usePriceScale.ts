@@ -13,8 +13,8 @@ interface PriceScale {
 }
 
 export function usePriceScale(
-  priceHistory: PricePoint[],
-  currentPrice: number,
+  _priceHistory: PricePoint[],
+  _currentPrice: number,
   targetPrice: number
 ): PriceScale {
   const [priceScale, setPriceScale] = useState<PriceScale>({
@@ -24,46 +24,20 @@ export function usePriceScale(
   });
 
   useEffect(() => {
-    const now = Date.now();
-    const timeWindow = 240 * 1000; // 4 minutes
-    const windowStart = now - timeWindow;
-
-    // Filter to only prices within the visible time window
-    const visiblePrices = priceHistory
-      .filter((p) => p.timestamp >= windowStart)
-      .map((p) => p.price);
-
-    let minPrice: number;
-    let maxPrice: number;
-    let priceRange: number;
-
-    // Always center around current price
-    if (visiblePrices.length > 1) {
-      const historyMin = Math.min(...visiblePrices);
-      const historyMax = Math.max(...visiblePrices);
-      const historyRange = historyMax - historyMin;
-
-      const maxZoomRange = currentPrice * 0.006; // 0.6% max
-      const minZoomRange = currentPrice * 0.002; // 0.2% min
-
-      const targetRange =
-        historyRange > 0
-          ? Math.max(Math.min(historyRange * 1.2, maxZoomRange), minZoomRange)
-          : minZoomRange;
-
-      minPrice = currentPrice - targetRange / 2;
-      maxPrice = currentPrice + targetRange / 2;
-      priceRange = targetRange;
-    } else {
-      // Fallback: tight zoom around current price
-      const padding = currentPrice * 0.003;
-      minPrice = currentPrice - padding;
-      maxPrice = currentPrice + padding;
-      priceRange = maxPrice - minPrice;
-    }
+    // Fixed price range - no auto-rebalancing for betting blocks
+    // Use $10 increments with 7 levels above and below (15 total levels)
+    // This ensures boxes stay aligned with price levels
+    const roundedTargetPrice = Math.round(targetPrice / 10) * 10;
+    const numIncrements = 7;
+    const priceIncrement = 10;
+    
+    // Fixed range based on target price (initial price)
+    const minPrice = roundedTargetPrice - numIncrements * priceIncrement;
+    const maxPrice = roundedTargetPrice + numIncrements * priceIncrement;
+    const priceRange = maxPrice - minPrice;
 
     setPriceScale({ minPrice, maxPrice, priceRange });
-  }, [priceHistory, currentPrice, targetPrice]);
+  }, [targetPrice]); // Only depend on targetPrice, not currentPrice
 
   return priceScale;
 }
