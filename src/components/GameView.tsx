@@ -7,7 +7,6 @@ import { PriceCanvas } from "./PriceCanvas";
 import { PriceScale } from "./PriceScale";
 import { BettingPanel } from "./BettingPanel";
 import { usePriceScale } from "../hooks/usePriceScale";
-import { useLiveTime } from "../hooks/useLiveTime";
 
 interface GameViewProps {
   market: Market;
@@ -27,7 +26,6 @@ export function GameView({ market, userBet }: GameViewProps) {
   const [currentPrice, setCurrentPrice] = useState(market.targetPrice);
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
   const [currentTime, setCurrentTime] = useState(Date.now());
-  const liveTime = useLiveTime();
   const priceScale = usePriceScale(
     priceHistory,
     currentPrice,
@@ -104,12 +102,17 @@ export function GameView({ market, userBet }: GameViewProps) {
         <div
           className="absolute bottom-0 z-30"
           style={{
-            left: "35%",
+            left: "30%",
             transform: "translateX(-50%)",
           }}
         >
-          <div className="text-[9px] font-mono text-orange-400 font-bold bg-black/95 px-2 py-1 rounded border border-orange-400/50 shadow-[0_0_8px_rgba(251,146,60,0.4)] backdrop-blur-sm whitespace-nowrap">
-            {liveTime}
+          <div className="text-[9px] font-mono text-orange-400 font-bold bg-black/95 px-2 py-1 rounded whitespace-nowrap">
+            {new Date(currentTime).toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+              hour12: false,
+            })}
           </div>
         </div>
       </div>

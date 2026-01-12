@@ -77,8 +77,8 @@ export function PriceCanvas({
         ctx.stroke();
       }
 
-      // Center X position - 35% from left
-      const priceLineX = canvas.width * 0.35;
+      // Center X position - 30% from left (matches Timeline CURRENT_TIME_POSITION)
+      const priceLineX = canvas.width * 0.30;
 
       // Calculate price scale for canvas drawing
       const roundedCurrentPrice = Math.round(currentPrice / 10) * 10;
