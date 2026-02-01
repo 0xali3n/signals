@@ -9,7 +9,7 @@ interface TimelineProps {
 
 // Constants
 const CURRENT_TIME_POSITION = 30; // Percentage from left (fixed NOW position)
-const GRID_INTERVAL_SECONDS = 60; // Grid marks every 60 seconds (1 minute)
+const GRID_INTERVAL_SECONDS = 20; // Grid marks every 20 seconds (reduced for faster block hits)
 
 // ============================================
 // TIMELINE CONFIGURATION
@@ -25,7 +25,7 @@ const TIMELINE_POSITION_OFFSET = 0; // Pixels (aligned with canvas)
 
 // 3. TIMELINE_MIN_SPACING: Minimum pixel spacing between visible time markers
 //    - 60 seconds = 120 pixels, so we use 110px to show all markers with slight buffer
-const TIMELINE_MIN_SPACING = 110; // Pixels
+const TIMELINE_MIN_SPACING = 50; // Pixels (reduced to match 20-second intervals: 20s × 2px/s = 40px)
 
 export function Timeline({
   currentTime,
@@ -70,7 +70,7 @@ export function Timeline({
     return -timeSinceStart * TIMELINE_SCROLL_SPEED;
   }, [currentTime, viewOffset]);
 
-  // Generate time markers at 60-second intervals
+  // Generate time markers at 20-second intervals
   const timeMarkers = useMemo(() => {
     const markers: Array<{ time: number; xPosition: number }> = [];
     const now = currentTime + viewOffset * 1000;

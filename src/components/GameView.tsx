@@ -275,7 +275,7 @@ export function GameView({ market, userBet }: GameViewProps) {
       const deltaY = e.clientY - dragStartRef.current.y;
       // Drag down = see higher prices (increase panY), drag up = see lower prices (decrease panY)
       // deltaY positive = dragging down, deltaY negative = dragging up
-      const newPanY = lastPanYRef.current + deltaY * 0.8; // Smooth pan speed
+      const newPanY = lastPanYRef.current + deltaY * 0.3; // Reduced sensitivity for smoother, more controlled panning
       setPanY(newPanY);
       dragStartRef.current = { x: e.clientX, y: e.clientY };
       lastPanYRef.current = newPanY; // Update ref immediately for smooth tracking
@@ -495,22 +495,25 @@ export function GameView({ market, userBet }: GameViewProps) {
   }, []);
 
   // Calculate which row the current price is at (for detecting box hits)
+  // Must match priceLevelsPerRow calculation to account for panY
   const currentPriceRowIndex = useMemo(() => {
     if (!initialLivePrice) return -1;
-    const basePrice = initialLivePrice;
-    const roundedBasePrice = Math.round(basePrice / 10) * 10;
+    // Use same calculation as priceLevelsPerRow to account for panY
+    const centerPrice = (initialLivePrice ?? market.targetPrice) + panY;
+    const priceIncrement = 10;
     const numIncrements = 7;
 
-    // Find which row the current price corresponds to
+    // Find which row the current price corresponds to (matching priceLevelsPerRow logic)
     for (let i = 0; i < 15; i++) {
-      const rowPrice = roundedBasePrice + (numIncrements - i) * 10;
+      const rowPrice = centerPrice + (numIncrements - i) * priceIncrement;
+      const roundedRowPrice = Math.round(rowPrice / priceIncrement) * priceIncrement;
       // Check if current price is within $5 of this row's price (half the increment)
-      if (Math.abs(currentPrice - rowPrice) <= 5) {
+      if (Math.abs(currentPrice - roundedRowPrice) <= 5) {
         return i;
       }
     }
     return -1;
-  }, [currentPrice, initialLivePrice]);
+  }, [currentPrice, initialLivePrice, panY, market.targetPrice]);
 
   // Use refs to avoid dependency issues and reduce re-renders
   const blastedBoxesRef = useRef(blastedBoxes);
