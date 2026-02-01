@@ -38,37 +38,38 @@ export function Header() {
 
 
   return (
-    <header className="bg-black/80 backdrop-blur-md sticky top-0 z-50 border-b border-orange-500/20">
-      <div className="container mx-auto px-4 sm:px-6 py-3 max-w-full">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex items-center">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+    <header className="bg-black/95 backdrop-blur-xl sticky top-0 z-50 border-b border-orange-500/20">
+      <div className="container mx-auto px-6 sm:px-8 py-4 max-w-full">
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-slate-800/50 border border-orange-500/20">
                 <img 
                   src="/logo.png" 
                   alt="Signals" 
-                  className="w-full h-full object-contain"
+                  className="w-10 h-10 object-contain"
                   onError={(e) => {
-                    // Fallback to text if image fails to load
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
                     if (target.parentElement) {
-                      target.parentElement.innerHTML = '<span class="text-white font-bold text-lg">S</span>';
-                      target.parentElement.className = 'w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center flex-shrink-0';
+                      target.parentElement.innerHTML = '<span class="text-orange-400 font-bold text-xl">S</span>';
                     }
                   }}
                 />
               </div>
+              <div className="flex flex-col">
+                <h1 className="text-lg font-bold text-orange-300 tracking-tight">Signals</h1>
+                <span className="text-[10px] px-2 py-0.5 bg-orange-500/15 text-orange-400 rounded-md font-medium border border-orange-500/30 whitespace-nowrap">
+                  Conway Testnet
+                </span>
+              </div>
             </div>
-            <span className="text-[10px] sm:text-xs px-2 py-0.5 bg-orange-500/10 text-orange-400 rounded-md font-medium border border-orange-500/20 whitespace-nowrap">
-              Conway Testnet
-            </span>
             
             {/* Game Info Button */}
             <div className="relative">
               <button
                 onClick={() => setShowGameInfo(!showGameInfo)}
-                className="p-1.5 hover:bg-orange-500/10 rounded-md transition-all active:scale-95 border border-orange-500/20 group"
+                className="p-2 hover:bg-orange-500/10 rounded-lg transition-colors border border-orange-500/20 hover:border-orange-500/30 group"
                 aria-label="How to Play"
               >
                 <svg 
@@ -88,7 +89,7 @@ export function Header() {
                     onClick={() => setShowGameInfo(false)}
                   ></div>
                   <div 
-                    className="absolute left-0 top-full mt-2 w-[calc(100vw-3rem)] sm:w-80 md:w-96 max-w-md bg-black/95 backdrop-blur-md rounded-xl border border-orange-500/30 z-50 shadow-2xl p-4 sm:p-5 md:p-6 animate-fade-in overflow-y-auto"
+                    className="absolute left-0 top-full mt-2 w-[calc(100vw-3rem)] sm:w-80 md:w-96 max-w-md bg-black/95 backdrop-blur-md rounded-xl border border-orange-500/20 z-50 p-4 sm:p-5 md:p-6 animate-fade-in overflow-y-auto"
                     style={{ 
                       maxHeight: 'calc(100vh - 8rem)'
                     }}
@@ -178,36 +179,36 @@ export function Header() {
           </div>
 
           {wallet && (
-            <div className="flex items-center gap-2 sm:gap-3 relative">
+            <div className="flex items-center gap-4 relative">
               {/* Balance Display */}
-              <div className="text-right pr-2 sm:pr-3 border-r border-orange-500/20">
-                <div className="flex items-center gap-1.5 justify-end mb-0.5">
-                  <svg className="w-3.5 h-3.5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="text-right pr-4 border-r border-orange-500/30">
+                <div className="flex items-center gap-2 justify-end mb-1">
+                  <svg className="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-xs sm:text-sm font-mono font-semibold text-orange-300">
+                  <p className="text-sm font-mono font-bold text-orange-300">
                     {balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
                 </div>
-                <p className="text-[9px] sm:text-[10px] text-slate-400">Balance</p>
+                <p className="text-[10px] text-slate-400 font-medium">Balance</p>
               </div>
 
-              <div className="text-right hidden sm:block pr-2 sm:pr-3 border-r border-orange-500/20">
+              <div className="text-right hidden sm:block pr-4 border-r border-orange-500/30">
                 {username && (
-                  <p className="text-xs sm:text-sm font-medium text-orange-300 mb-0.5 truncate max-w-[120px] sm:max-w-none">
+                  <p className="text-sm font-semibold text-orange-300 mb-1 truncate max-w-[140px]">
                     {username}
                   </p>
                 )}
-                <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-pulse flex-shrink-0"></div>
-                  <p className="text-[10px] sm:text-xs font-mono text-orange-400 truncate">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse flex-shrink-0"></div>
+                  <p className="text-xs font-mono text-orange-400/90 truncate">
                     {wallet.address.slice(0, 8)}...{wallet.address.slice(-6)}
                   </p>
                 </div>
                 {wallet.chainId && (
                   <button
                     onClick={() => setShowDetails(!showDetails)}
-                    className="text-[10px] sm:text-xs text-orange-400 hover:text-orange-300 mt-1 underline transition-colors"
+                    className="text-xs text-orange-400/80 hover:text-orange-300 mt-1.5 transition-colors font-medium"
                   >
                     {showDetails ? 'Hide' : 'View'} Details
                   </button>
@@ -220,7 +221,7 @@ export function Header() {
                     className="fixed inset-0 z-20" 
                     onClick={() => setShowDetails(false)}
                   ></div>
-                  <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-black/90 backdrop-blur-md rounded-lg border border-orange-500/20 z-30 shadow-xl p-3 sm:p-4 animate-fade-in">
+                  <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-black/90 backdrop-blur-md rounded-lg border border-orange-500/20 z-30 p-3 sm:p-4 animate-fade-in">
                     <div className="space-y-2 sm:space-y-3">
                       <div>
                         <p className="text-[10px] sm:text-xs text-slate-400 mb-1">Wallet Address</p>
@@ -247,14 +248,14 @@ export function Header() {
               )}
               
               <div className="relative">
-                <button
-                  onClick={() => setShowMenu(!showMenu)}
-                  className="p-1.5 hover:bg-orange-500/10 rounded-md transition-all active:scale-95 border border-orange-500/20"
-                >
-                  <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                  </svg>
-                </button>
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="p-2 hover:bg-orange-500/10 rounded-lg transition-colors border border-orange-500/20 hover:border-orange-500/30"
+              >
+                <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                </svg>
+              </button>
 
                 {showMenu && (
                   <>
@@ -262,7 +263,7 @@ export function Header() {
                       className="fixed inset-0 z-10" 
                       onClick={() => setShowMenu(false)}
                     ></div>
-                    <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-black/90 backdrop-blur-md rounded-lg border border-orange-500/20 z-20 overflow-hidden shadow-xl animate-fade-in">
+                    <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-black/90 backdrop-blur-md rounded-lg border border-orange-500/20 z-20 overflow-hidden animate-fade-in">
                       <button
                         onClick={handleExport}
                         className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-xs sm:text-sm text-orange-300 hover:bg-orange-500/10 transition-colors flex items-center gap-2"

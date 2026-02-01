@@ -4,7 +4,7 @@
 
 @layer utilities {
   .animate-fade-in {
-    animation: fadeIn 0.2s ease-in-out;
+    animation: fadeIn 0.2s ease-out;
   }
 }
 
@@ -57,6 +57,22 @@
   /* Cyberpunk font for game view */
   .cyberpunk-font {
     font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+  }
+  
+  /* Prevent text selection on game view */
+  .game-view {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* Allow selection in specific areas */
+  .selectable {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
   }
 }
 

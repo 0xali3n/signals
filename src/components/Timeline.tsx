@@ -17,7 +17,7 @@ const GRID_INTERVAL_SECONDS = 60; // Grid marks every 60 seconds (1 minute)
 // 1. TIMELINE_SCROLL_SPEED: Controls how fast the timeline scrolls
 //    - 1 minute = 120 pixels (2 pixels/second × 60 seconds)
 //    - This ensures proper spacing and smooth scrolling
-const TIMELINE_SCROLL_SPEED = 2; // Pixels per second
+const TIMELINE_SCROLL_SPEED = 3.5; // Pixels per second (increased for faster movement)
 
 // 2. TIMELINE_POSITION_OFFSET: Fine-tune alignment with NOW indicator
 //    - Adjusts horizontal position to match PriceCanvas NOW line exactly
@@ -183,7 +183,7 @@ export function Timeline({
         <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex items-center gap-2 z-40 pointer-events-auto">
           <button
             onClick={handleBack}
-            className="px-3 py-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-orange-500/40 hover:border-orange-500/60 rounded-md text-orange-400 text-[10px] font-mono font-semibold transition-all duration-200 shadow-lg"
+            className="px-3 py-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-orange-500/40 hover:border-orange-500/60 rounded-md text-orange-400 text-[10px] font-mono font-semibold transition-all duration-200"
             title="Go back 1 minute"
           >
             ← BACK
@@ -198,7 +198,7 @@ export function Timeline({
           </button>
           <button
             onClick={handleForward}
-            className="px-3 py-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-orange-500/40 hover:border-orange-500/60 rounded-md text-orange-400 text-[10px] font-mono font-semibold transition-all duration-200 shadow-lg"
+            className="px-3 py-1.5 bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-orange-500/40 hover:border-orange-500/60 rounded-md text-orange-400 text-[10px] font-mono font-semibold transition-all duration-200"
             title="Go forward 1 minute"
           >
             FORWARD →

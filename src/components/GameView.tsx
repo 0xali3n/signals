@@ -38,6 +38,11 @@ export function GameView({ market, userBet }: GameViewProps) {
   const startTimeRef = useRef<number>(Date.now());
   // Store initial live price for fixed price scale (centered on this price)
   const [initialLivePrice, setInitialLivePrice] = useState<number | null>(null);
+  // Pan controls
+  const [panY, setPanY] = useState(0); // Vertical pan offset for price
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const lastPanYRef = useRef(0);
   // Track selected betting blocks (array to support multiple selections)
   const [selectedBlocks, setSelectedBlocks] = useState<
     Array<{
@@ -143,11 +148,26 @@ export function GameView({ market, userBet }: GameViewProps) {
     [placeBet]
   );
 
-  const priceScale = usePriceScale(
+  // Calculate price scale with pan support
+  const basePriceScale = usePriceScale(
     priceHistory,
     currentPrice,
     initialLivePrice ?? market.targetPrice
   );
+  
+  // Apply pan to price scale
+  const priceScale = useMemo(() => {
+    const centerPrice = initialLivePrice ?? market.targetPrice;
+    const baseRange = basePriceScale.priceRange;
+    // panY: positive = drag down shows lower prices, negative = drag up shows higher prices
+    const minPrice = centerPrice - baseRange / 2 + panY;
+    const maxPrice = centerPrice + baseRange / 2 + panY;
+    return {
+      minPrice,
+      maxPrice,
+      priceRange: baseRange,
+    };
+  }, [basePriceScale, panY, initialLivePrice, market.targetPrice]);
 
   // Timeline constants (matching Timeline component)
   const CURRENT_TIME_POSITION = 30; // Percentage from left
@@ -219,6 +239,94 @@ export function GameView({ market, userBet }: GameViewProps) {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
+
+  // TradingView-style pan: click and drag to move price view
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Only allow pan on canvas area, not on boxes, buttons, or interactive elements
+    const target = e.target as HTMLElement;
+    // Check if clicking on a box or interactive element
+    const isBox = target.closest('[data-price-level]');
+    const isButton = target.closest('button');
+    const isInput = target.closest('input');
+    const isSelectable = target.closest('.selectable');
+    const isCanvas = target.tagName === 'CANVAS';
+    
+    // Allow pan if clicking on canvas area (not on boxes/buttons/inputs)
+    // Works on canvas element or empty space
+    if (
+      e.button === 0 && 
+      !isBox &&
+      !isButton &&
+      !isInput &&
+      !isSelectable &&
+      (isCanvas || target === e.currentTarget)
+    ) {
+      setIsDragging(true);
+      dragStartRef.current = { x: e.clientX, y: e.clientY };
+      lastPanYRef.current = panY;
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, [panY]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (isDragging) {
+      e.preventDefault();
+      const deltaY = e.clientY - dragStartRef.current.y;
+      // Drag down = see higher prices (increase panY), drag up = see lower prices (decrease panY)
+      // deltaY positive = dragging down, deltaY negative = dragging up
+      const newPanY = lastPanYRef.current + deltaY * 0.8; // Smooth pan speed
+      setPanY(newPanY);
+      dragStartRef.current = { x: e.clientX, y: e.clientY };
+      lastPanYRef.current = newPanY; // Update ref immediately for smooth tracking
+    }
+  }, [isDragging]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Global mouse handlers for smooth dragging
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        e.preventDefault();
+        const deltaY = e.clientY - dragStartRef.current.y;
+        // Drag up = see higher prices (increase panY), drag down = see lower prices (decrease panY)
+        const newPanY = lastPanYRef.current + deltaY * 0.8; // Smooth pan speed
+        setPanY(newPanY);
+        dragStartRef.current = { x: e.clientX, y: e.clientY };
+        lastPanYRef.current = newPanY; // Update ref immediately for smooth tracking
+      }
+    };
+
+    const handleGlobalMouseUp = () => {
+      if (isDragging) {
+        // Sync ref with current state
+        lastPanYRef.current = panY;
+      }
+      setIsDragging(false);
+    };
+    
+    if (isDragging) {
+      window.addEventListener('mousemove', handleGlobalMouseMove, { passive: false });
+      window.addEventListener('mouseup', handleGlobalMouseUp);
+      document.body.style.userSelect = 'none'; // Prevent text selection
+      document.body.style.cursor = 'grabbing';
+      return () => {
+        window.removeEventListener('mousemove', handleGlobalMouseMove);
+        window.removeEventListener('mouseup', handleGlobalMouseUp);
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+      };
+    }
+  }, [isDragging, panY]);
+
+  // Reset pan (double-click to reset)
+  const handleDoubleClick = useCallback(() => {
+    setPanY(0);
+  }, []);
+
   // Calculate vertical line positions (matching PriceCanvas logic)
   const verticalLinePositions = useMemo(() => {
     const priceCanvasOffset = 112; // 7rem (left-28) in pixels
@@ -252,24 +360,21 @@ export function GameView({ market, userBet }: GameViewProps) {
   }, [containerHeight]);
 
   // Calculate price level for each row (for betting blocks)
-  // Each row represents a $10 price increment
-  // Use initial live price (or target price as fallback) for fixed scale
   const priceLevelsPerRow = useMemo(() => {
-    const basePrice = initialLivePrice ?? market.targetPrice;
-    const roundedBasePrice = Math.round(basePrice / 10) * 10;
-    const numIncrements = 7; // 7 increments above and below = 15 total levels
-    const priceIncrement = 10;
-
+    const centerPrice = (initialLivePrice ?? market.targetPrice) + panY;
+    const priceIncrement = 10; // Fixed increment
+    const numIncrements = 7; // Fixed number of increments
+    
     // Calculate price for each row (15 rows, highest at top)
     const prices: number[] = [];
     for (let i = 0; i < 15; i++) {
       // Row 0 = highest price, Row 14 = lowest price
-      const price = roundedBasePrice + (numIncrements - i) * priceIncrement;
-      prices.push(price);
+      const price = centerPrice + (numIncrements - i) * priceIncrement;
+      prices.push(Math.round(price / priceIncrement) * priceIncrement);
     }
 
     return prices;
-  }, [market.targetPrice, initialLivePrice]);
+  }, [market.targetPrice, initialLivePrice, panY]);
 
   // Calculate NOW position for timeline markers (matching Timeline component)
   const nowPixelPosition = useMemo(() => {
@@ -545,7 +650,13 @@ export function GameView({ market, userBet }: GameViewProps) {
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black overflow-hidden border-0"
+      className="relative w-full h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black overflow-hidden select-none"
+      style={{
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        MozUserSelect: 'none',
+        msUserSelect: 'none'
+      }}
     >
       {/* Grid overlay */}
       <div
@@ -575,11 +686,13 @@ export function GameView({ market, userBet }: GameViewProps) {
 
         {/* Box grid - rows of boxes moving right to left */}
         <div
-          className="absolute top-0 bottom-0 left-0 right-0 pointer-events-auto"
+          className="absolute top-0 bottom-0 left-0 right-0 pointer-events-none select-none"
           style={{
             transform: `translate3d(${timelineScrollOffset}px, 0, 0)`,
             willChange: "transform",
             backfaceVisibility: "hidden",
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
           }}
         >
           {horizontalLinePositions.slice(0, -1).map((y, rowIndex) => {
@@ -680,8 +793,8 @@ export function GameView({ market, userBet }: GameViewProps) {
                       const pulse = Math.sin(Date.now() / 200) * 0.1 + 0.9;
                       borderOpacity = 0.7 * pulse;
                       bgOpacity = 0.15 * pulse;
-                      boxShadow = `0 0 ${12 * pulse}px rgba(251, 146, 60, ${
-                        0.4 * pulse
+                      boxShadow = `0 0 ${6 * pulse}px rgba(251, 146, 60, ${
+                        0.3 * pulse
                       })`;
                       transform = "translateX(-50%)";
                       cursor = "wait";
@@ -715,37 +828,18 @@ export function GameView({ market, userBet }: GameViewProps) {
                       if (hasPlayed) {
                         if (isWin) {
                           boxShadow = `0 0 ${
-                            25 + blastProgress * 35
-                          }px rgba(34, 197, 94, ${0.8 - blastProgress * 0.6}), 
-                                   0 0 ${
-                                     50 + blastProgress * 60
-                                   }px rgba(22, 163, 74, ${
-                            0.6 - blastProgress * 0.5
-                          }), 0 0 ${
-                            80 + blastProgress * 100
-                          }px rgba(16, 185, 129, ${0.3 - blastProgress * 0.3})`;
+                            15 + blastProgress * 20
+                          }px rgba(34, 197, 94, ${0.5 - blastProgress * 0.4})`;
                         } else {
                           boxShadow = `0 0 ${
-                            25 + blastProgress * 35
-                          }px rgba(239, 68, 68, ${0.8 - blastProgress * 0.6}), 
-                                   0 0 ${
-                                     50 + blastProgress * 60
-                                   }px rgba(220, 38, 38, ${
-                            0.6 - blastProgress * 0.5
-                          }), 0 0 ${
-                            80 + blastProgress * 100
-                          }px rgba(185, 28, 28, ${0.3 - blastProgress * 0.3})`;
+                            15 + blastProgress * 20
+                          }px rgba(239, 68, 68, ${0.5 - blastProgress * 0.4})`;
                         }
                       } else {
                         // Neutral orange glow if user hasn't played
                         boxShadow = `0 0 ${
-                          20 + blastProgress * 30
-                        }px rgba(251, 146, 60, ${0.6 - blastProgress * 0.5}), 
-                                 0 0 ${
-                                   40 + blastProgress * 50
-                                 }px rgba(255, 100, 0, ${
-                          0.4 - blastProgress * 0.4
-                        })`;
+                          10 + blastProgress * 15
+                        }px rgba(251, 146, 60, ${0.4 - blastProgress * 0.3})`;
                       }
                       opacity = 1 - blastProgress;
                       cursor = "default";
@@ -753,7 +847,7 @@ export function GameView({ market, userBet }: GameViewProps) {
                       // "No bets allowed" state: greyed out but with subtle glow
                       borderOpacity = 0.35;
                       bgOpacity = 0.05;
-                      boxShadow = "0 0 8px rgba(251, 146, 60, 0.15)";
+                      boxShadow = "0 0 4px rgba(251, 146, 60, 0.2)";
                       transform = "translateX(-50%)";
                       cursor = "not-allowed";
                       opacity = 1;
@@ -761,7 +855,7 @@ export function GameView({ market, userBet }: GameViewProps) {
                       // Selected state: professional, clean, minimal
                       borderOpacity = 0.9;
                       bgOpacity = 0.12;
-                      boxShadow = "0 0 8px rgba(251, 146, 60, 0.3)";
+                      boxShadow = "0 0 6px rgba(251, 146, 60, 0.4)";
                       transform = "translateX(-50%)";
                       cursor = "pointer";
                       opacity = 1;
@@ -776,8 +870,8 @@ export function GameView({ market, userBet }: GameViewProps) {
                         ? 0.03 + opacityFactor * 0.05
                         : 0.05 + opacityFactor * 0.1;
                       boxShadow = `0 0 ${
-                        8 + opacityFactor * 4
-                      }px rgba(251, 146, 60, ${0.2 + opacityFactor * 0.2})`;
+                        4 + opacityFactor * 2
+                      }px rgba(251, 146, 60, ${0.2 + opacityFactor * 0.15})`;
                       transform = "translateX(-50%)";
                       cursor = isColumnAtMax ? "not-allowed" : "pointer";
                       opacity = 1;
@@ -791,7 +885,7 @@ export function GameView({ market, userBet }: GameViewProps) {
                             ? ""
                             : isSelected
                             ? ""
-                            : "hover:scale-[1.02] hover:shadow-md hover:shadow-orange-500/20"
+                            : "hover:scale-[1.01]"
                         }`}
                         data-price-level={priceLevel}
                         data-timestamp={marker.time}
@@ -801,6 +895,12 @@ export function GameView({ market, userBet }: GameViewProps) {
                           width: `${boxWidth}px`,
                           height: `${boxHeight}px`,
                           transform,
+                          userSelect: 'none',
+                          WebkitUserSelect: 'none',
+                          MozUserSelect: 'none',
+                          msUserSelect: 'none',
+                          WebkitTouchCallout: 'none',
+                          pointerEvents: 'auto', // Boxes need to receive clicks
                           borderColor: isBlasted
                             ? (() => {
                                 const hasPlayed =
@@ -840,7 +940,11 @@ export function GameView({ market, userBet }: GameViewProps) {
                             ? "transform, opacity"
                             : "transform, box-shadow",
                         }}
-                        onClick={async () => {
+                        onMouseDown={(e) => {
+                          e.stopPropagation(); // Prevent pan when clicking boxes
+                        }}
+                        onClick={async (e) => {
+                          e.stopPropagation(); // Prevent pan when clicking boxes
                           if (!isPending) {
                             await handleBoxClick(
                               priceLevel,
@@ -1012,11 +1116,8 @@ export function GameView({ market, userBet }: GameViewProps) {
               "repeating-linear-gradient(to bottom, rgba(251, 146, 60, 0.4) 0px, rgba(251, 146, 60, 0.4) 3px, transparent 3px, transparent 6px)",
             boxShadow:
               priceLinePulse > 0
-                ? `0 0 ${10 + priceLinePulse * 10}px rgba(251, 146, 60, ${
-                    0.5 + priceLinePulse * 0.3
-                  }), 
-                 0 0 ${20 + priceLinePulse * 20}px rgba(255, 100, 0, ${
-                    0.3 + priceLinePulse * 0.2
+                ? `0 0 ${6 + priceLinePulse * 4}px rgba(251, 146, 60, ${
+                    0.4 + priceLinePulse * 0.2
                   })`
                 : "none",
             transition: "transform 0.1s ease-out, box-shadow 0.2s ease-out",
@@ -1038,10 +1139,27 @@ export function GameView({ market, userBet }: GameViewProps) {
       <PriceScale
         currentPrice={currentPrice}
         targetPrice={initialLivePrice ?? market.targetPrice}
+        panY={panY}
       />
 
-      {/* Price line canvas */}
-      <div className="absolute left-28 right-0 top-0 bottom-36">
+
+      {/* Price line canvas - TradingView-style controls */}
+      <div 
+        className="absolute left-28 right-0 top-0 bottom-36 select-none"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onDoubleClick={handleDoubleClick}
+        style={{ 
+          cursor: isDragging ? 'grabbing' : 'grab',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          MozUserSelect: 'none',
+          msUserSelect: 'none',
+          WebkitTouchCallout: 'none'
+        }}
+      >
         <PriceCanvas
           priceHistory={priceHistory}
           currentPrice={currentPrice}
@@ -1056,7 +1174,7 @@ export function GameView({ market, userBet }: GameViewProps) {
             transform: "translateX(-50%)",
           }}
         >
-          <div className="bg-black/95 backdrop-blur-sm px-2.5 py-1.5 rounded-md border border-orange-500/50 shadow-lg">
+          <div className="bg-black/90 backdrop-blur-sm px-2.5 py-1.5 rounded-md border border-orange-500/30">
             <div className="text-[10px] font-mono text-orange-300 font-bold whitespace-nowrap">
               {(() => {
                 const date = new Date(currentTime);
@@ -1078,20 +1196,20 @@ export function GameView({ market, userBet }: GameViewProps) {
       />
 
       {/* HUD Elements */}
-      <div className="absolute top-4 sm:top-6 left-28 right-4 sm:right-6 flex items-center justify-start z-20">
-        <div className="px-3 sm:px-4 py-1.5 sm:py-2 bg-black/30 backdrop-blur-sm rounded-lg border border-orange-500/20">
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
-            <div className="text-[10px] sm:text-xs text-slate-400">
+      <div className="absolute top-6 left-28 right-6 flex items-center justify-start z-20">
+        <div className="px-5 py-3 bg-black/70 backdrop-blur-xl rounded-xl border border-orange-500/20">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="text-xs text-slate-300 font-medium">
               Current Price
             </div>
-            <div className="text-[9px] sm:text-[10px] font-semibold text-orange-400/80 bg-orange-500/20 px-1.5 sm:px-2 py-0.5 rounded">
+            <div className="text-[10px] font-bold text-orange-400 bg-orange-500/25 px-2.5 py-1 rounded-md border border-orange-500/30">
               BTC/USDT
             </div>
-            <div className="text-[9px] sm:text-[10px] font-semibold text-slate-500 bg-slate-800/50 px-1.5 sm:px-2 py-0.5 rounded">
+            <div className="text-[10px] font-semibold text-slate-400 bg-slate-800/60 px-2.5 py-1 rounded-md border border-slate-700/50">
               BINANCE
             </div>
           </div>
-          <div className="text-lg sm:text-xl font-mono font-semibold text-orange-400">
+          <div className="text-2xl font-mono font-bold text-orange-300 tracking-tight">
             $
             {currentPrice.toLocaleString(undefined, {
               maximumFractionDigits: 2,
@@ -1120,7 +1238,7 @@ export function GameView({ market, userBet }: GameViewProps) {
       {/* Error message for max selections */}
       {maxSelectionError && (
         <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-40 animate-fade-in">
-          <div className="px-4 py-2.5 bg-red-500/90 backdrop-blur-sm rounded-lg border border-red-400/50 shadow-lg">
+          <div className="px-4 py-2.5 bg-red-500/90 backdrop-blur-sm rounded-lg border border-red-400/50">
             <p className="text-sm font-medium text-white text-center">
               {maxSelectionError}
             </p>
@@ -1129,10 +1247,10 @@ export function GameView({ market, userBet }: GameViewProps) {
       )}
 
       {/* Info note in footer */}
-      <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-30 pointer-events-none">
-        <div className="px-3 py-1.5 bg-black/40 backdrop-blur-sm rounded border border-orange-500/10">
-          <p className="text-[10px] text-slate-400 text-center">
-            Maximum 3 boxes per column in one game • Click to select/unselect
+      <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-30 pointer-events-none">
+        <div className="px-4 py-2 bg-black/70 backdrop-blur-md rounded-lg border border-orange-500/20">
+          <p className="text-xs text-slate-300 text-center font-medium">
+            Maximum 3 boxes per column • Click to select • Drag to pan • Double-click to reset
           </p>
         </div>
       </div>
@@ -1141,10 +1259,10 @@ export function GameView({ market, userBet }: GameViewProps) {
       {gameResult && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none">
           <div
-            className={`px-8 py-5 rounded-xl border-2 shadow-2xl backdrop-blur-lg ${
+            className={`px-8 py-5 rounded-xl border-2 backdrop-blur-lg ${
               gameResult.type === "win"
-                ? "bg-gradient-to-br from-green-500/25 via-green-500/15 to-green-600/25 border-green-400/70 shadow-green-500/30"
-                : "bg-gradient-to-br from-red-500/25 via-red-500/15 to-red-600/25 border-red-400/70 shadow-red-500/30"
+                ? "bg-green-500/20 border-green-400/50"
+                : "bg-red-500/20 border-red-400/50"
             }`}
             style={{
               animation:
@@ -1187,8 +1305,8 @@ export function GameView({ market, userBet }: GameViewProps) {
                 <p
                   className={`text-2xl font-extrabold tracking-tight ${
                     gameResult.type === "win"
-                      ? "text-green-200 drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]"
-                      : "text-red-200 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]"
+                      ? "text-green-200"
+                      : "text-red-200"
                   }`}
                 >
                   {gameResult.message}

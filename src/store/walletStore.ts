@@ -48,7 +48,7 @@ export const useWalletStore = create<WalletState>()(
     (set, get) => ({
       wallet: null,
       username: null,
-      balance: 1000, // Sample balance for MVP
+      balance: 10000, // Initial balance for all users
       isLoading: false,
       error: null,
       isInitialized: false,
@@ -71,9 +71,9 @@ export const useWalletStore = create<WalletState>()(
             isLoading: false,
           });
 
-          // If no balance has ever been set (or was persisted as 0), give user sample 1000 tokens
+          // If no balance has ever been set (or was persisted as 0), give user 10000 tokens
           if (!get().balance || get().balance <= 0) {
-            set({ balance: 1000 });
+            set({ balance: 10000 });
           }
 
           // Fetch balance if wallet exists (will keep current balance if fetch fails)
@@ -165,7 +165,7 @@ export const useWalletStore = create<WalletState>()(
             isLoading: false,
             creationStep: "complete",
             creationMessage: "Wallet created successfully!",
-            balance: 1000, // Sample balance: 1000 tokens for MVP
+            balance: 10000, // Initial balance: 10000 tokens
           });
 
           // Balance is managed locally - no need to fetch from blockchain

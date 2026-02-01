@@ -6,7 +6,7 @@ import { useWalletStore } from "../store/walletStore";
 
 const MOCK_MARKET: Market = {
   id: "market-1",
-  endTime: Date.now() + 60000, // 60 seconds from now
+  endTime: Date.now() + 86400000 * 365, // 1 year from now (always open)
   targetPrice: 50000,
   isClosed: false,
   totalPool: 0,
@@ -28,13 +28,7 @@ export function useMarket() {
         throw new Error("Wallet not connected");
       }
 
-      if (market.isClosed) {
-        throw new Error("Market is closed");
-      }
-
-      if (Date.now() >= market.endTime) {
-        throw new Error("Market has ended");
-      }
+      // Market is always open for MVP
 
       try {
         setIsLoading(true);
@@ -70,14 +64,10 @@ export function useMarket() {
     [wallet, market, updateBalance]
   );
 
-  // Claim reward (local only)
+  // Claim reward (local only) - simplified for MVP
   const claimReward = useCallback(async () => {
     if (!wallet || !userBet) {
       throw new Error("No bet to claim");
-    }
-
-    if (!market.isClosed) {
-      throw new Error("Market is not closed yet");
     }
 
     try {
@@ -94,12 +84,12 @@ export function useMarket() {
     } finally {
       setIsLoading(false);
     }
-  }, [wallet, userBet, market]);
+  }, [wallet, userBet]);
 
   const marketState: MarketState = {
     market,
     userBet: userBet || undefined,
-    canClaim: market.isClosed && userBet !== null && !userBet.claimed,
+    canClaim: false, // Simplified for MVP - no claim needed
   };
 
   return {

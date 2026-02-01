@@ -32,11 +32,11 @@ function App() {
       <Header />
       
       {!wallet || (creationStep !== 'idle' && creationStep !== 'complete') ? (
-        <div className="flex items-center justify-center min-h-[calc(100vh-80px)]">
+        <div className="flex items-center justify-center min-h-[calc(100vh-88px)]">
           <WalletSetup />
         </div>
         ) : (
-          <div className="fixed inset-0 top-16 pb-20">
+          <div className="fixed inset-0 top-[72px] pb-20">
             <GameView 
               market={marketState.market} 
               userBet={marketState.userBet}

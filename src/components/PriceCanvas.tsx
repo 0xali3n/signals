@@ -50,8 +50,9 @@ export function PriceCanvas({
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Update animation time for floating effect - slower for smoother motion
-      animationTimeRef.current += 0.016; // ~60fps
+      // Update animation time for smooth professional motion
+      // Use consistent frame timing for smooth animation
+      animationTimeRef.current += 0.016; // ~60fps - consistent timing
 
       // Detect price change and trigger wave animation
       if (Math.abs(currentPrice - previousPriceRef.current) > 0.01) {
@@ -59,9 +60,9 @@ export function PriceCanvas({
         previousPriceRef.current = currentPrice;
       }
 
-      // Update price change animation - smoother transition
+      // Update price change animation - professional smooth transition
       if (priceChangeAnimationRef.current < 1) {
-        priceChangeAnimationRef.current += 0.03; // Slower transition
+        priceChangeAnimationRef.current += 0.025; // Slower, more professional transition
         if (priceChangeAnimationRef.current > 1)
           priceChangeAnimationRef.current = 1;
       }
@@ -88,16 +89,16 @@ export function PriceCanvas({
       const timeWindow = 240 * 1000; // 4 minutes
       const startTime = now - timeWindow;
 
-      // Smooth floating animation - slower and gentler
-      // Use slower frequencies and smaller amplitudes for smooth flow
-      const floatOffset = Math.sin(animationTimeRef.current * 0.8) * 0.6; // Reduced from 2*1.5 to 0.8*0.6
-      const floatOffsetX = Math.cos(animationTimeRef.current * 0.6) * 0.3; // Reduced from 1.5*0.8 to 0.6*0.3
+      // Professional smooth movement - minimal floating for premium feel
+      // Very subtle movement for professional appearance
+      const floatOffset = Math.sin(animationTimeRef.current * 0.5) * 0.3; // Very subtle vertical float
+      const floatOffsetX = Math.cos(animationTimeRef.current * 0.4) * 0.15; // Very subtle horizontal float
 
-      // Wave animation when price changes - smoother easing
+      // Smooth wave animation when price changes - professional easing
       const waveOffset =
         priceChangeAnimationRef.current < 1
           ? Math.sin(priceChangeAnimationRef.current * Math.PI) *
-            1.5 * // Reduced from 3 to 1.5
+            0.8 * // Subtle wave effect
             (1 - priceChangeAnimationRef.current)
           : 0;
 
@@ -116,8 +117,9 @@ export function PriceCanvas({
         smoothedXRef.current = targetX;
       }
 
-      // Smooth interpolation for head point position (reduces jitter)
-      const smoothingFactor = 0.2; // Lower = smoother but slower response (0.15-0.25 is good)
+      // Professional smooth interpolation for head point position (eliminates jitter)
+      // Higher smoothing factor for ultra-smooth, professional movement
+      const smoothingFactor = 0.15; // Lower = smoother, more professional (0.12-0.18 is optimal)
       smoothedYRef.current +=
         (targetY - smoothedYRef.current) * smoothingFactor;
       smoothedXRef.current +=
@@ -132,11 +134,12 @@ export function PriceCanvas({
           .sort((a, b) => a.timestamp - b.timestamp);
 
         if (pointsToDraw.length > 0) {
-          // Draw price line - STABLE, no wave or shake animations
+          // Draw price line - premium smooth and professional
           ctx.strokeStyle = "#F4C430";
-          ctx.lineWidth = 2;
-          ctx.shadowBlur = 4;
-          ctx.shadowColor = "rgba(244, 196, 48, 0.4)";
+          ctx.lineWidth = 2.5; // Slightly thicker for better visibility
+          ctx.lineCap = "round"; // Smooth line caps
+          ctx.lineJoin = "round"; // Smooth line joins
+          ctx.shadowBlur = 0;
           ctx.beginPath();
 
           const firstPoint = pointsToDraw[0];
@@ -181,9 +184,11 @@ export function PriceCanvas({
                 ((prevPoint.price - canvasMinPrice) / canvasPriceRange) *
                   canvas.height;
 
-              // Smooth curve control point
-              const controlX = (prevX + x) / 2;
-              const controlY = (prevY + y) / 2;
+              // Professional smooth curve with better interpolation
+              // Use weighted control points for smoother curves
+              const t = 0.5; // Control point position (0.5 = midpoint)
+              const controlX = prevX + (x - prevX) * t;
+              const controlY = prevY + (y - prevY) * t;
               ctx.quadraticCurveTo(controlX, controlY, x, y);
             }
           });
@@ -194,13 +199,13 @@ export function PriceCanvas({
           const startDotX = smoothedXRef.current;
           const startDotY = currentY;
 
-          // Smooth pulsing glow - slower and gentler
-          const glowPulse = Math.sin(animationTimeRef.current * 1.2) * 1.5; // Reduced from 3*2 to 1.2*1.5
-          const shadowBlur = 8 + glowPulse; // Reduced base from 10 to 8
+          // Professional subtle pulsing glow - minimal and elegant
+          const glowPulse = Math.sin(animationTimeRef.current * 1.0) * 1.0; // Very subtle pulse
+          const shadowBlur = 6 + glowPulse; // Professional subtle glow
 
-          // Smooth size pulse - slower and smaller
-          const sizePulse = Math.sin(animationTimeRef.current * 1.5) * 0.3; // Reduced from 4*0.5 to 1.5*0.3
-          const dotSize = 5 + sizePulse;
+          // Professional subtle size pulse - minimal variation
+          const sizePulse = Math.sin(animationTimeRef.current * 1.2) * 0.2; // Very subtle size variation
+          const dotSize = 5.5 + sizePulse; // Slightly larger base size
 
           ctx.fillStyle = "#F4C430";
           ctx.shadowBlur = shadowBlur;
@@ -221,10 +226,9 @@ export function PriceCanvas({
             ((tailPoint.price - canvasMinPrice) / canvasPriceRange) *
               canvas.height;
 
-          // Static tail dot - no pulsing
+          // Static tail dot
           ctx.fillStyle = "#F4C430";
-          ctx.shadowBlur = 6;
-          ctx.shadowColor = "rgba(244, 196, 48, 0.6)";
+          ctx.shadowBlur = 0;
           ctx.beginPath();
           ctx.arc(
             tailX,
@@ -289,22 +293,20 @@ export function PriceCanvas({
         const indicatorX = smoothedXRef.current;
         const indicatorY = currentY;
 
-        // Smooth pulsing glow - slower frequency
-        const pulseGlow = 7 + Math.sin(animationTimeRef.current * 1.0) * 2; // Reduced from 3.5*3 to 1.0*2
-        const pulseSize = 5 + Math.sin(animationTimeRef.current * 1.2) * 0.4; // Reduced from 4*0.6 to 1.2*0.4
+        // Clean indicator without excessive glow
+        const pulseSize = 5;
 
         ctx.fillStyle = "#F4C430";
-        ctx.shadowBlur = pulseGlow;
-        ctx.shadowColor = "rgba(244, 196, 48, 0.7)";
+        ctx.shadowBlur = 0;
         ctx.beginPath();
         ctx.arc(indicatorX, indicatorY, pulseSize, 0, Math.PI * 2);
         ctx.fill();
 
-        // Horizontal line - smooth wave
-        const lineWave = Math.sin(animationTimeRef.current * 1.0) * 0.3; // Reduced from 2.5*0.5 to 1.0*0.3
-        ctx.strokeStyle = "#F4C430";
-        ctx.lineWidth = 1;
-        ctx.shadowBlur = 2;
+          // Horizontal line - clean
+          const lineWave = 0;
+          ctx.strokeStyle = "#F4C430";
+          ctx.lineWidth = 1;
+          ctx.shadowBlur = 0;
         ctx.beginPath();
         ctx.moveTo(indicatorX - 15, indicatorY + lineWave);
         ctx.lineTo(indicatorX + 15, indicatorY + lineWave);
@@ -331,7 +333,10 @@ export function PriceCanvas({
     <canvas
       ref={canvasRef}
       className="w-full h-full"
-      style={{ imageRendering: "crisp-edges" }}
+      style={{ 
+        imageRendering: "crisp-edges",
+        pointerEvents: "none" // Allow mouse events to pass through to parent
+      }}
     />
   );
 }
