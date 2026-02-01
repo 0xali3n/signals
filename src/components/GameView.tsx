@@ -70,6 +70,9 @@ export function GameView({ market, userBet }: GameViewProps) {
       }
     >
   >(new Map());
+  // Track which columns (timestamps) have been hit - only one hit per column
+  // Map: timestamp -> hitTime (when it was hit)
+  const [hitColumns, setHitColumns] = useState<Map<number, number>>(new Map());
   // Track price line animation when hitting boxes
   const [priceLinePulse, setPriceLinePulse] = useState(0);
   // Track win/lose notifications
@@ -536,7 +539,7 @@ export function GameView({ market, userBet }: GameViewProps) {
   // Optimized: Throttled check to reduce performance impact
   useEffect(() => {
     const hitThreshold = 8; // Pixels - when box left edge is this close, trigger blast
-    const blastDuration = 120; // ms - how long the blast animation lasts
+    const blastDuration = 2500; // ms - 2.5 seconds for full anime-style slash and destroy animation visibility
 
     // Only check if we have a valid current price row
     if (currentPriceRowIndex < 0) return;
@@ -569,8 +572,22 @@ export function GameView({ market, userBet }: GameViewProps) {
         ) {
           const boxKey = `${priceLevel}-${marker.time}`;
 
+          // CRITICAL: Only allow one hit per column (timestamp)
+          // If this column has already been hit, skip it
+          if (hitColumns.has(marker.time)) {
+            return; // Column already hit, skip
+          }
+
           // Check if this specific box hasn't been blasted yet
           if (!blastedBoxesRef.current.has(boxKey)) {
+            // Mark this column as hit with current time - prevents other blocks in same column from being hit
+            // This allows us to delay hiding blocks for 1-2 seconds
+            setHitColumns((prev) => {
+              const newMap = new Map(prev);
+              newMap.set(marker.time, performance.now());
+              return newMap;
+            });
+
             // Check if this box is selected
             const isSelected = selectedBlocksMapRef.current.has(boxKey);
 
@@ -628,13 +645,14 @@ export function GameView({ market, userBet }: GameViewProps) {
             setTimeout(() => setPriceLinePulse(0), 200);
 
             // Remove blasted box after animation completes
+            // Keep the hit block visible for full 2.5 seconds so users can see the animation
             setTimeout(() => {
               setBlastedBoxes((prev) => {
                 const newMap = new Map(prev);
                 newMap.delete(boxKey);
                 return newMap;
               });
-            }, blastDuration);
+            }, blastDuration); // 2.5 seconds total for full animation visibility
           }
         }
       });
@@ -730,6 +748,18 @@ export function GameView({ market, userBet }: GameViewProps) {
                     const boxKey = `${priceLevel}-${marker.time}`;
                     const isBlasted = blastedBoxes.has(boxKey);
 
+                    // Hide all other blocks in this column if column has been hit
+                    // Wait 2.5 seconds (2500ms) before hiding blocks to let user see the full animation
+                    const columnHitTime = hitColumns.get(marker.time);
+                    if (columnHitTime && !isBlasted) {
+                      const timeSinceHit = performance.now() - columnHitTime;
+                      const hideDelay = 2500; // 2.5 seconds delay - matches animation duration
+                      if (timeSinceHit >= hideDelay) {
+                        return false; // Hide other blocks in hit column after delay
+                      }
+                      // Keep blocks visible during the delay period so users can see the animation
+                    }
+
                     return leftEdge > nowPixelPosition || isBlasted;
                   })
                   .map((marker) => {
@@ -744,10 +774,10 @@ export function GameView({ market, userBet }: GameViewProps) {
                     // Use requestAnimationFrame time for smoother progress calculation
                     const blastProgress = blastData
                       ? Math.min(
-                          (performance.now() - blastData.startTime) / 120,
+                          (performance.now() - blastData.startTime) / 2500,
                           1
                         )
-                      : 0; // 120ms animation duration
+                      : 0; // 2.5 seconds (2500ms) animation duration for full anime-style slash and destroy visibility
 
                     // Check if box is in "no bets allowed" zone (between referenceLineX and oneMinuteLineX)
                     const leftEdge = adjustedPosition - boxWidth / 2;
@@ -803,48 +833,86 @@ export function GameView({ market, userBet }: GameViewProps) {
                       cursor = "wait";
                       opacity = pulse;
                     } else if (isBlasted) {
-                      // Blast animation state - cracked and exploding
+                      // Anime-style dramatic slash and destruction animation
                       // Color depends on whether box was selected (win = green, lose = red)
                       const isWin = blastData?.isSelected ?? false;
                       const hasPlayed =
                         (selectedCountByTimestamp.get(marker.time) ?? 0) > 0;
 
-                      // Smoother animation with easing
-                      // Use ease-out curve for smoother feel
-                      const easedProgress = 1 - Math.pow(1 - blastProgress, 3); // Cubic ease-out
-                      const shake =
-                        Math.sin(easedProgress * Math.PI * 12) *
-                        (1 - easedProgress) *
-                        2.5;
-                      const scale =
-                        1 + (1 - easedProgress) * 0.12 - easedProgress * 0.35;
-                      const rotation =
-                        (1 - easedProgress) *
-                        Math.sin(easedProgress * Math.PI * 6) *
-                        6;
+                      // Anime-style animation phases:
+                      // Enlarge phase (0-15%): Block enlarges dramatically to show it's hit
+                      // Slash phase (15-30%): Sword slash appears and cuts through
+                      // Split phase (30-50%): Block splits in half along slash line
+                      // Break phase (50-75%): Block breaks into pieces with dramatic effect
+                      // Fade phase (75-100%): Pieces scatter and fade away
+                      const enlargePhase = Math.min(blastProgress / 0.15, 1);
+                      const slashPhase = Math.min(Math.max((blastProgress - 0.15) / 0.15, 0), 1);
+                      const splitPhase = Math.min(Math.max((blastProgress - 0.3) / 0.2, 0), 1);
+                      const breakPhase = Math.min(Math.max((blastProgress - 0.5) / 0.25, 0), 1);
+                      const fadePhase = Math.max((blastProgress - 0.75) / 0.25, 0);
+                      
+                      // ENLARGE EFFECT: Dramatic zoom-in when hit to show which block was hit
+                      const enlargeScale = enlargePhase < 1
+                        ? 1 + enlargePhase * 0.5 // Enlarge to 1.5x size
+                        : 1.5 - (slashPhase * 0.2); // Slight shrink during slash
+                      
+                      // Dramatic shake during slash impact
+                      const impactShake = slashPhase < 1 && enlargePhase >= 1
+                        ? Math.sin(slashPhase * Math.PI * 20) * (1 - slashPhase) * 5
+                        : 0;
+                      
+                      // Block splits in half during split phase
+                      const splitOffset = splitPhase * 8; // Horizontal separation
+                      const splitRotation = splitPhase * 8; // Rotation as it splits
+                      
+                      // Final scale: start with enlarge, then apply break shrink
+                      const scale = enlargePhase < 1
+                        ? enlargeScale
+                        : breakPhase < 1
+                        ? (enlargeScale * (1 - breakPhase * 0.4)) // Combine enlarge with break shrink
+                        : ((enlargeScale * 0.6) - fadePhase * 0.3); // Continue shrinking during fade
+                      
+                      // Rotation: dramatic spin during break
+                      const rotation = splitPhase < 1
+                        ? splitRotation
+                        : breakPhase * Math.sin(breakPhase * Math.PI * 6) * 25 + fadePhase * 30;
 
-                      transform = `translateX(calc(-50% + ${shake}px)) scale(${scale}) rotate(${rotation}deg)`;
-                      borderOpacity = 0.95 - blastProgress * 0.8;
-                      bgOpacity = 0.25 - blastProgress * 0.25;
+                      // Z-index boost to ensure hit block appears on top
+                      transform = `translateX(calc(-50% + ${impactShake}px + ${splitOffset}px)) scale(${scale}) rotate(${rotation}deg) translateZ(0)`;
+                      
+                      // Opacity: fade during break and fade phases
+                      borderOpacity = breakPhase < 1
+                        ? 0.95 - breakPhase * 0.5
+                        : 0.45 - fadePhase * 0.45;
+                      bgOpacity = breakPhase < 1
+                        ? 0.25 - breakPhase * 0.2
+                        : 0.05 - fadePhase * 0.05;
 
-                      // Green glow for win, red glow for lose, orange for neutral (no play)
+                      // Anime-style intense glow: bright flash during slash, then fade
                       if (hasPlayed) {
                         if (isWin) {
-                          boxShadow = `0 0 ${
-                            15 + blastProgress * 20
-                          }px rgba(34, 197, 94, ${0.5 - blastProgress * 0.4})`;
+                          boxShadow = slashPhase < 1
+                            ? `0 0 ${30 + slashPhase * 40}px rgba(34, 197, 94, ${0.9 - slashPhase * 0.4}), 0 0 ${60 + slashPhase * 80}px rgba(34, 197, 94, ${0.5 - slashPhase * 0.3})`
+                            : breakPhase < 1
+                            ? `0 0 ${70 - breakPhase * 50}px rgba(34, 197, 94, ${0.5 - breakPhase * 0.4})`
+                            : `0 0 ${20 - fadePhase * 20}px rgba(34, 197, 94, ${0.1 - fadePhase * 0.1})`;
                         } else {
-                          boxShadow = `0 0 ${
-                            15 + blastProgress * 20
-                          }px rgba(239, 68, 68, ${0.5 - blastProgress * 0.4})`;
+                          boxShadow = slashPhase < 1
+                            ? `0 0 ${30 + slashPhase * 40}px rgba(239, 68, 68, ${0.9 - slashPhase * 0.4}), 0 0 ${60 + slashPhase * 80}px rgba(239, 68, 68, ${0.5 - slashPhase * 0.3})`
+                            : breakPhase < 1
+                            ? `0 0 ${70 - breakPhase * 50}px rgba(239, 68, 68, ${0.5 - breakPhase * 0.4})`
+                            : `0 0 ${20 - fadePhase * 20}px rgba(239, 68, 68, ${0.1 - fadePhase * 0.1})`;
                         }
                       } else {
                         // Neutral orange glow if user hasn't played
-                        boxShadow = `0 0 ${
-                          10 + blastProgress * 15
-                        }px rgba(251, 146, 60, ${0.4 - blastProgress * 0.3})`;
+                        boxShadow = slashPhase < 1
+                          ? `0 0 ${25 + slashPhase * 35}px rgba(251, 146, 60, ${0.7 - slashPhase * 0.3}), 0 0 ${50 + slashPhase * 60}px rgba(251, 146, 60, ${0.4 - slashPhase * 0.2})`
+                          : breakPhase < 1
+                          ? `0 0 ${60 - breakPhase * 40}px rgba(251, 146, 60, ${0.4 - breakPhase * 0.3})`
+                          : `0 0 ${20 - fadePhase * 20}px rgba(251, 146, 60, ${0.1 - fadePhase * 0.1})`;
                       }
-                      opacity = 1 - blastProgress;
+                      
+                      opacity = breakPhase < 1 ? 1 : 1 - fadePhase;
                       cursor = "default";
                     } else if (isInNoBetsZone) {
                       // "No bets allowed" state: greyed out but with subtle glow
@@ -942,6 +1010,7 @@ export function GameView({ market, userBet }: GameViewProps) {
                           willChange: isBlasted
                             ? "transform, opacity"
                             : "transform, box-shadow",
+                          zIndex: isBlasted ? 100 : 1, // Enlarged hit block appears on top
                         }}
                         onMouseDown={(e) => {
                           e.stopPropagation(); // Prevent pan when clicking boxes
@@ -1008,26 +1077,119 @@ export function GameView({ market, userBet }: GameViewProps) {
                                 crackColorSecondary = "rgba(220, 38, 38, 0.7)";
                               }
 
+                              // Professional crack pattern - more realistic and detailed
+                              // Calculate phases for crack pattern
+                              const destroyPhase = Math.max((blastProgress - 0.4) / 0.6, 0);
+                              const crackOpacity = Math.min(blastProgress * 2.5, 1);
+                              const pieceOpacity = Math.max((blastProgress - 0.4) * 1.67, 0);
+                              
                               return (
-                                <svg
-                                  className="absolute inset-0 w-full h-full"
-                                  viewBox="0 0 100 100"
-                                  preserveAspectRatio="none"
-                                >
-                                  <path
-                                    d="M20,20 L30,25 L25,40 L15,35 Z M50,10 L55,20 L45,30 L40,15 Z M70,15 L75,30 L65,35 L60,20 Z M30,60 L40,65 L35,80 L25,75 Z M60,70 L70,75 L65,90 L55,85 Z"
-                                    stroke={crackColor}
-                                    strokeWidth="1.8"
-                                    fill="none"
-                                    strokeLinecap="round"
-                                  />
-                                  <path
-                                    d="M10,50 L90,50 M50,10 L50,90"
-                                    stroke={crackColorSecondary}
-                                    strokeWidth="1.2"
-                                    strokeDasharray="2,2"
-                                  />
-                                </svg>
+                                <>
+                                  {/* Main crack lines - appear first */}
+                                  <svg
+                                    className="absolute inset-0 w-full h-full"
+                                    viewBox="0 0 100 100"
+                                    preserveAspectRatio="none"
+                                    style={{ opacity: crackOpacity }}
+                                  >
+                                    {/* Central crack from impact point */}
+                                    <path
+                                      d="M50,20 Q45,40 40,60 Q35,75 30,90"
+                                      stroke={crackColor}
+                                      strokeWidth="2"
+                                      fill="none"
+                                      strokeLinecap="round"
+                                    />
+                                    <path
+                                      d="M50,20 Q55,40 60,60 Q65,75 70,90"
+                                      stroke={crackColor}
+                                      strokeWidth="2"
+                                      fill="none"
+                                      strokeLinecap="round"
+                                    />
+                                    {/* Branching cracks */}
+                                    <path
+                                      d="M40,50 L35,45 L30,40 M60,50 L65,45 L70,40"
+                                      stroke={crackColor}
+                                      strokeWidth="1.5"
+                                      fill="none"
+                                      strokeLinecap="round"
+                                    />
+                                    <path
+                                      d="M35,70 L30,75 L25,80 M65,70 L70,75 L75,80"
+                                      stroke={crackColor}
+                                      strokeWidth="1.5"
+                                      fill="none"
+                                      strokeLinecap="round"
+                                    />
+                                    {/* Secondary cracks */}
+                                    <path
+                                      d="M20,30 L25,35 L20,40 M80,30 L75,35 L80,40"
+                                      stroke={crackColorSecondary}
+                                      strokeWidth="1.2"
+                                      fill="none"
+                                      strokeLinecap="round"
+                                      opacity="0.7"
+                                    />
+                                  </svg>
+                                  {/* Destruction pieces - appear during destruction phase */}
+                                  {pieceOpacity > 0 && (
+                                    <div
+                                      className="absolute inset-0 pointer-events-none"
+                                      style={{ opacity: pieceOpacity }}
+                                    >
+                                      {/* Floating pieces effect */}
+                                      <div
+                                        className="absolute"
+                                        style={{
+                                          left: '20%',
+                                          top: '20%',
+                                          width: '8px',
+                                          height: '8px',
+                                          background: crackColor,
+                                          borderRadius: '2px',
+                                          transform: `translate(${destroyPhase * 15}px, ${destroyPhase * 20}px) rotate(${destroyPhase * 45}deg)`,
+                                        }}
+                                      />
+                                      <div
+                                        className="absolute"
+                                        style={{
+                                          left: '70%',
+                                          top: '30%',
+                                          width: '6px',
+                                          height: '6px',
+                                          background: crackColorSecondary,
+                                          borderRadius: '2px',
+                                          transform: `translate(${-destroyPhase * 12}px, ${destroyPhase * 18}px) rotate(${-destroyPhase * 30}deg)`,
+                                        }}
+                                      />
+                                      <div
+                                        className="absolute"
+                                        style={{
+                                          left: '40%',
+                                          top: '60%',
+                                          width: '7px',
+                                          height: '7px',
+                                          background: crackColor,
+                                          borderRadius: '2px',
+                                          transform: `translate(${destroyPhase * 10}px, ${-destroyPhase * 15}px) rotate(${destroyPhase * 60}deg)`,
+                                        }}
+                                      />
+                                      <div
+                                        className="absolute"
+                                        style={{
+                                          left: '60%',
+                                          top: '70%',
+                                          width: '5px',
+                                          height: '5px',
+                                          background: crackColorSecondary,
+                                          borderRadius: '2px',
+                                          transform: `translate(${-destroyPhase * 8}px, ${-destroyPhase * 12}px) rotate(${-destroyPhase * 40}deg)`,
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </>
                               );
                             })()}
                           </div>
