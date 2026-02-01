@@ -59,9 +59,7 @@ export function BettingPanel({ market, userBet }: BettingPanelProps) {
                     // Note: This panel is for legacy betting.
                     // New betting system uses box clicks in GameView.
                     // This button is disabled as it requires priceLevel and timestamp.
-                    console.warn(
-                      "Legacy betting panel - use box clicks in game view instead"
-                    );
+                    // Legacy betting panel - use box clicks in game view instead
                   }}
                   disabled={true}
                   className="px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-orange-500/50 to-amber-500/50 hover:from-orange-600/50 hover:to-amber-600/50 text-white/50 text-sm sm:text-base font-semibold rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-not-allowed"

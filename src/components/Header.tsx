@@ -1,29 +1,15 @@
 // Main header component with wallet address display
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useWalletStore } from '../store/walletStore';
 import { exportWallet } from '../utils/wallet';
 
 export function Header() {
-  const { wallet, username, balance, deleteWallet, fetchBalance } = useWalletStore();
+  const { wallet, username, balance, deleteWallet } = useWalletStore();
   const [showMenu, setShowMenu] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showGameInfo, setShowGameInfo] = useState(false);
 
-  // Fetch balance periodically when wallet is connected
-  useEffect(() => {
-    if (!wallet || !wallet.chainId) return;
-
-    // Fetch immediately
-    fetchBalance();
-
-    // Refresh balance every 30 seconds
-    const interval = setInterval(() => {
-      fetchBalance();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [wallet, fetchBalance]);
 
   const handleDisconnect = () => {
     if (confirm('Are you sure you want to disconnect? You can import your wallet later.')) {
@@ -168,7 +154,7 @@ export function Header() {
                           <div className="flex-1 min-w-0">
                             <h4 className="text-orange-400 font-semibold mb-1 text-xs sm:text-sm">Rewards</h4>
                             <p className="text-slate-400 text-[10px] sm:text-xs leading-relaxed">
-                              Winners share the <strong className="text-orange-400">column pool</strong>. Divided equally. Distributed via <strong className="text-orange-400">Linera contract</strong>.
+                              Winners get <strong className="text-orange-400">2x their bet amount</strong> instantly. Rewards are managed locally for fast gameplay.
                             </p>
                           </div>
                         </div>
@@ -179,8 +165,8 @@ export function Header() {
                           <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                           </svg>
-                          <p className="text-[10px] sm:text-xs text-slate-400 leading-relaxed">
-                            <strong className="text-orange-300">On-chain:</strong> All bets & rewards managed via Linera smart contracts.
+                            <p className="text-[10px] sm:text-xs text-slate-400 leading-relaxed">
+                            <strong className="text-orange-300">Local:</strong> All bets & rewards managed locally for fast, smooth gameplay.
                           </p>
                         </div>
                       </div>
@@ -202,15 +188,6 @@ export function Header() {
                   <p className="text-xs sm:text-sm font-mono font-semibold text-orange-300">
                     {balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
-                  <button
-                    onClick={() => fetchBalance()}
-                    className="ml-1 p-0.5 hover:bg-orange-500/10 rounded transition-colors"
-                    title="Refresh balance"
-                  >
-                    <svg className="w-3 h-3 text-orange-400/60 hover:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </button>
                 </div>
                 <p className="text-[9px] sm:text-[10px] text-slate-400">Balance</p>
               </div>

@@ -4,16 +4,16 @@ A real-time crypto prediction game built on **Linera Conway Testnet** for the Ak
 
 ## 🎯 Product
 
-Users select betting blocks representing specific price levels. Each block requires **100 tokens** to bet. When the live price line hits a selected block, users win and share the **column pool** equally. All bets and rewards are managed on-chain via Linera smart contracts.
+Users select betting blocks representing specific price levels. Each block requires **100 tokens** to bet. When the live price line hits a selected block, users win and get rewards. All bets and rewards are managed locally for fast, smooth gameplay.
 
 ## 🚀 Tech Stack
 
 - **Frontend**: React + Vite + TypeScript + Tailwind CSS
-- **Blockchain**: Linera Conway Testnet
-- **Wallet**: Embedded wallet using Linera Web Client
+- **Wallet**: Embedded wallet using Linera Web Client (for wallet creation only)
 - **Client**: `@linera/client` v0.15.8
 - **State Management**: Zustand
 - **Real-time Data**: Binance WebSocket API for BTC price
+- **Betting**: Local state management (fast and smooth)
 
 ## ✅ Completed Features
 
@@ -139,7 +139,7 @@ src/
 │   └── walletStore.ts               # Zustand wallet state
 ├── utils/
 │   ├── wallet.ts                    # Wallet operations
-│   ├── lineraClient.ts              # Linera client utilities
+│   ├── lineraClient.ts              # Linera client utilities (wallet creation only)
 │   └── btcPrice.ts                  # Binance WebSocket price feed
 └── types/
     └── index.ts                      # TypeScript types
@@ -161,7 +161,7 @@ src/
 1. **Select Blocks**: Click betting blocks to select (max 3 per column). Each block = one price level.
 2. **Place Bet**: 100 tokens per block. Added to column pool. Multiple users can bet.
 3. **Watch & Win**: Live price line moves right to left. When it hits your block → You Win!
-4. **Rewards**: Winners share the column pool equally. Distributed via Linera smart contract.
+4. **Rewards**: Winners get 2x their bet amount instantly. Rewards are managed locally for fast gameplay.
 
 ### Key Features
 
@@ -190,20 +190,18 @@ src/
 
 ## ⚠️ Current Status
 
-- **Frontend**: ✅ Complete with MVP mode (works without contract)
-- **Betting Integration**: ✅ Box selection triggers bet placement
-- **Contract**: ⏳ Structure created, needs Rust implementation
-- **Deployment**: ⏳ Ready when contract is built
+- **Frontend**: ✅ Complete and optimized
+- **Betting Integration**: ✅ Box selection triggers bet placement (local)
+- **Wallet Creation**: ✅ Full wallet creation with Linera faucet
+- **Performance**: ✅ Optimized for smooth gameplay (20fps updates, throttled checks)
 
-## 🚧 Next Steps
+## 🎯 Features
 
-1. ✅ Frontend betting integration complete
-2. ✅ MVP mode working (no contract needed for testing)
-3. ⏳ Implement Rust contract in `contract/` directory
-4. ⏳ Build WASM files: `cargo build --release --target wasm32-unknown-unknown`
-5. ⏳ Deploy to Conway Testnet
-6. ⏳ Update Application ID in `src/config/contract.ts`
-7. ⏳ Test end-to-end with on-chain bets
+- ✅ Fast local betting system (no blockchain delays)
+- ✅ Smooth animations and responsive UI
+- ✅ Wallet creation and management
+- ✅ Real-time BTC price tracking
+- ✅ Optimized performance (reduced lag)
 
 ## 🔗 Resources
 

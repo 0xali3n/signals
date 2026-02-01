@@ -168,11 +168,7 @@ export const useWalletStore = create<WalletState>()(
             balance: 1000, // Sample balance: 1000 tokens for MVP
           });
 
-          // Fetch actual balance from microchain (with retry)
-          // Wait a bit for chain to be ready
-          setTimeout(async () => {
-            await get().fetchBalance();
-          }, 1000);
+          // Balance is managed locally - no need to fetch from blockchain
 
           return newWallet;
         } catch (err) {
@@ -218,39 +214,9 @@ export const useWalletStore = create<WalletState>()(
       clearError: () => set({ error: null }),
 
       fetchBalance: async () => {
-        const { wallet, lineraWalletInstance } = get();
-        if (!wallet || !wallet.chainId || !lineraWalletInstance) {
-          return;
-        }
-
-        try {
-          const { createClient, getChainBalance } = await import("../utils/lineraClient");
-          const client = await createClient(lineraWalletInstance, wallet.privateKey);
-          const balanceStr = await getChainBalance(client, wallet.chainId);
-          
-          // Parse balance (Linera returns balance as string)
-          // Balance format may vary, try to parse as number
-          // If it's in attos (smallest unit), we might need to divide, but for MVP assume it's already in tokens
-          let balance = 0;
-          if (balanceStr) {
-            const parsed = parseFloat(balanceStr);
-            if (!isNaN(parsed) && parsed > 0) {
-              balance = parsed;
-            } else {
-              // If balance is 0 or invalid, use current balance or default
-              balance = get().balance || 1000; // Keep current balance or use default
-            }
-          } else {
-            // If balance fetch returns empty, keep current balance
-            balance = get().balance || 1000; // Keep current balance or use default
-          }
-          
-          set({ balance });
-        } catch (error) {
-          console.error("Failed to fetch balance:", error);
-          // Keep current balance if fetch fails (don't reset to 1000)
-          // This preserves balance changes from betting
-        }
+        // Local balance only - no blockchain fetching
+        // Balance is managed locally through updateBalance
+        return;
       },
 
       updateBalance: (amount: number) => {

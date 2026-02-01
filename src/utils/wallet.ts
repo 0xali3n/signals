@@ -149,11 +149,7 @@ export async function importWallet(exportedData: string, _password: string): Pro
         chainId: decrypted.chainId, // IMPORTANT: Preserve microchain ID
       };
       
-      console.log('Wallet imported successfully:', {
-        address: importedWallet.address,
-        hasChainId: !!importedWallet.chainId,
-        chainId: importedWallet.chainId,
-      });
+      // Wallet imported successfully
       
       return importedWallet;
     } catch (verifyError) {

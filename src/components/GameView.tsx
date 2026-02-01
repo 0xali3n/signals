@@ -105,7 +105,7 @@ export function GameView({ market, userBet }: GameViewProps) {
           setPendingBets((prev) => new Set(prev).add(betKey));
 
           try {
-            // Place bet on-chain (or mock if contract not deployed)
+            // Place bet locally
             const betAmount = 100; // Fixed 100 tokens per block
             const bet = await placeBet(priceLevel, timestamp, betAmount);
 
@@ -116,7 +116,7 @@ export function GameView({ market, userBet }: GameViewProps) {
             ]);
             setMaxSelectionError(null);
           } catch (error) {
-            console.error("Failed to place bet:", error);
+            // Failed to place bet - error handled by UI
             setMaxSelectionError(
               error instanceof Error
                 ? error.message
@@ -174,10 +174,7 @@ export function GameView({ market, userBet }: GameViewProps) {
         }
       } catch (error) {
         // Fallback to market.targetPrice if fetch fails
-        console.warn(
-          "Failed to fetch initial price, using target price:",
-          error
-        );
+        // Failed to fetch initial price, using target price as fallback
         if (isMounted) {
           setInitialLivePrice(market.targetPrice);
           setCurrentPrice(market.targetPrice);
@@ -373,26 +370,21 @@ export function GameView({ market, userBet }: GameViewProps) {
   }, [currentTime]);
 
   // Update current time continuously for smooth timeline scrolling
-  // Throttle to ~30fps for better performance (reduced from 60fps)
+  // Throttle to ~20fps for better performance
   useEffect(() => {
-    let animationFrameId: number;
-    let lastTime = 0;
-    const targetFPS = 30; // Reduced for better performance
+    let intervalId: number;
+    const targetFPS = 20; // Reduced for better performance
     const interval = 1000 / targetFPS;
 
-    const updateTime = (currentFrameTime: number) => {
-      if (currentFrameTime - lastTime >= interval) {
-        setCurrentTime(Date.now());
-        lastTime = currentFrameTime;
-      }
-      animationFrameId = requestAnimationFrame(updateTime);
+    const updateTime = () => {
+      setCurrentTime(Date.now());
     };
 
-    animationFrameId = requestAnimationFrame(updateTime);
+    intervalId = setInterval(updateTime, interval);
 
     return () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
+      if (intervalId) {
+        clearInterval(intervalId);
       }
     };
   }, []);
@@ -433,10 +425,10 @@ export function GameView({ market, userBet }: GameViewProps) {
   }, [selectedCountByTimestamp]);
 
   // Detect individual boxes being hit and trigger blast animation
-  // Optimized: Only check when position changes significantly
+  // Optimized: Throttled check to reduce performance impact
   useEffect(() => {
     const hitThreshold = 8; // Pixels - when box left edge is this close, trigger blast
-    const blastDuration = 120; // ms - how long the blast animation lasts (fast and snappy)
+    const blastDuration = 120; // ms - how long the blast animation lasts
 
     // Only check if we have a valid current price row
     if (currentPriceRowIndex < 0) return;
@@ -444,123 +436,110 @@ export function GameView({ market, userBet }: GameViewProps) {
     // Early exit if no markers
     if (timelineMarkers.length === 0) return;
 
-    const avgBoxWidth = TIMELINE_MIN_SPACING * 0.85 * 0.85;
-    const priceLevel = priceLevelsPerRow[currentPriceRowIndex];
+    // Throttle checks to reduce CPU usage
+    const checkInterval = setInterval(() => {
+      const avgBoxWidth = TIMELINE_MIN_SPACING * 0.85 * 0.85;
+      const priceLevel = priceLevelsPerRow[currentPriceRowIndex];
 
-    // Only check markers near the live price line (optimization)
-    const checkRange = hitThreshold + avgBoxWidth;
-    const markersToCheck = timelineMarkers.filter((marker) => {
-      const adjustedPosition = marker.xPosition + timelineScrollOffset;
-      const leftEdge = adjustedPosition - avgBoxWidth / 2;
-      return Math.abs(leftEdge - nowPixelPosition) < checkRange;
-    });
+      // Only check markers near the live price line (optimization)
+      const checkRange = hitThreshold + avgBoxWidth;
+      const markersToCheck = timelineMarkers.filter((marker) => {
+        const adjustedPosition = marker.xPosition + timelineScrollOffset;
+        const leftEdge = adjustedPosition - avgBoxWidth / 2;
+        return Math.abs(leftEdge - nowPixelPosition) < checkRange;
+      });
 
-    markersToCheck.forEach((marker) => {
-      const adjustedPosition = marker.xPosition + timelineScrollOffset;
-      const leftEdge = adjustedPosition - avgBoxWidth / 2;
-      const distanceFromLine = leftEdge - nowPixelPosition;
+      markersToCheck.forEach((marker) => {
+        const adjustedPosition = marker.xPosition + timelineScrollOffset;
+        const leftEdge = adjustedPosition - avgBoxWidth / 2;
+        const distanceFromLine = leftEdge - nowPixelPosition;
 
-      // Check if box left edge is about to touch the line (within threshold)
-      if (
-        distanceFromLine <= hitThreshold &&
-        distanceFromLine >= -hitThreshold
-      ) {
-        const boxKey = `${priceLevel}-${marker.time}`;
+        // Check if box left edge is about to touch the line (within threshold)
+        if (
+          distanceFromLine <= hitThreshold &&
+          distanceFromLine >= -hitThreshold
+        ) {
+          const boxKey = `${priceLevel}-${marker.time}`;
 
-        // Check if this specific box hasn't been blasted yet
-        if (!blastedBoxesRef.current.has(boxKey)) {
-          // Check if this box is selected
-          const isSelected = selectedBlocksMapRef.current.has(boxKey);
+          // Check if this specific box hasn't been blasted yet
+          if (!blastedBoxesRef.current.has(boxKey)) {
+            // Check if this box is selected
+            const isSelected = selectedBlocksMapRef.current.has(boxKey);
 
-          // Check if user has selected any boxes in this column (has played)
-          const hasPlayedInColumn =
-            (selectedCountByTimestampRef.current.get(marker.time) ?? 0) > 0;
+            // Check if user has selected any boxes in this column (has played)
+            const hasPlayedInColumn =
+              (selectedCountByTimestampRef.current.get(marker.time) ?? 0) > 0;
 
-          // Trigger blast animation for this specific box only
-          setBlastedBoxes((prev) => {
-            const newMap = new Map(prev);
-            newMap.set(boxKey, {
-              startTime: performance.now(), // Use performance.now() for smoother animation
-              priceLevel,
-              timestamp: marker.time,
-              isSelected,
-            });
-            return newMap;
-          });
-
-          // Only show win/lose notification if user has played in this column
-          if (hasPlayedInColumn) {
-            // Process win/lose only once per box
-            if (!processedWinsRef.current.has(boxKey)) {
-              processedWinsRef.current.add(boxKey);
-
-              const betAmount = 100; // Fixed bet amount per block
-
-              if (isSelected) {
-                // WIN: Add double the bet amount (2x return)
-                // User bet 100, gets 200 back (net gain: +100)
-                const winReward = betAmount * 2;
-
-                updateBalance(winReward);
-
-                setGameResult({
-                  type: "win",
-                  message: `You Win! +${winReward} tokens`,
-                  timestamp: performance.now(),
-                });
-              } else {
-                // LOSE: Do nothing (balance already deducted when bet was placed)
-                // Money is gone - no refund
-                setGameResult({
-                  type: "lose",
-                  message: `You Lose -${betAmount} tokens`,
-                  timestamp: performance.now(),
-                });
-              }
-            } else {
-              // Already processed, just show notification
-              if (isSelected) {
-                setGameResult({
-                  type: "win",
-                  message: "You Win!",
-                  timestamp: performance.now(),
-                });
-              } else {
-                setGameResult({
-                  type: "lose",
-                  message: "You Lose",
-                  timestamp: performance.now(),
-                });
-              }
-            }
-
-            // Auto-hide notification after 2.5 seconds
-            setTimeout(() => {
-              setGameResult(null);
-            }, 2500);
-          }
-
-          // Trigger price line pulse animation
-          setPriceLinePulse(1);
-          setTimeout(() => setPriceLinePulse(0), 200);
-
-          // Remove blasted box after animation completes
-          setTimeout(() => {
+            // Trigger blast animation for this specific box only
             setBlastedBoxes((prev) => {
               const newMap = new Map(prev);
-              newMap.delete(boxKey);
+              newMap.set(boxKey, {
+                startTime: performance.now(),
+                priceLevel,
+                timestamp: marker.time,
+                isSelected,
+              });
               return newMap;
             });
-          }, blastDuration);
+
+            // Only show win/lose notification if user has played in this column
+            if (hasPlayedInColumn) {
+              // Process win/lose only once per box
+              if (!processedWinsRef.current.has(boxKey)) {
+                processedWinsRef.current.add(boxKey);
+
+                const betAmount = 100; // Fixed bet amount per block
+
+                if (isSelected) {
+                  // WIN: Add double the bet amount (2x return)
+                  const winReward = betAmount * 2;
+                  updateBalance(winReward);
+                  setGameResult({
+                    type: "win",
+                    message: `You Win! +${winReward} tokens`,
+                    timestamp: performance.now(),
+                  });
+                } else {
+                  // LOSE: Do nothing (balance already deducted when bet was placed)
+                  setGameResult({
+                    type: "lose",
+                    message: `You Lose -${betAmount} tokens`,
+                    timestamp: performance.now(),
+                  });
+                }
+              }
+
+              // Auto-hide notification after 2.5 seconds
+              setTimeout(() => {
+                setGameResult(null);
+              }, 2500);
+            }
+
+            // Trigger price line pulse animation
+            setPriceLinePulse(1);
+            setTimeout(() => setPriceLinePulse(0), 200);
+
+            // Remove blasted box after animation completes
+            setTimeout(() => {
+              setBlastedBoxes((prev) => {
+                const newMap = new Map(prev);
+                newMap.delete(boxKey);
+                return newMap;
+              });
+            }, blastDuration);
+          }
         }
-      }
-    });
+      });
+    }, 50); // Check every 50ms instead of every render
+
+    return () => clearInterval(checkInterval);
   }, [
     timelineMarkers,
     timelineScrollOffset,
     nowPixelPosition,
     currentPriceRowIndex,
     priceLevelsPerRow,
+    updateBalance,
   ]);
 
   return (
@@ -625,10 +604,6 @@ export function GameView({ market, userBet }: GameViewProps) {
                   .filter((marker) => {
                     const adjustedPosition =
                       marker.xPosition + timelineScrollOffset;
-                    // Box disappears when its left edge touches the live price line
-                    // adjustedPosition is center of box, left edge is at adjustedPosition - boxWidth/2
-                    // We want to show boxes whose left edge hasn't reached the line yet
-                    // Show when: left edge > nowPixelPosition
                     const leftEdge = adjustedPosition - boxWidth / 2;
 
                     // Early exit optimization: skip if way past the line
@@ -636,7 +611,6 @@ export function GameView({ market, userBet }: GameViewProps) {
 
                     // Get price level for this row
                     const priceLevel = priceLevelsPerRow[rowIndex];
-                    // Check if this specific box is being blasted - keep it visible during animation
                     const boxKey = `${priceLevel}-${marker.time}`;
                     const isBlasted = blastedBoxes.has(boxKey);
 
@@ -648,8 +622,6 @@ export function GameView({ market, userBet }: GameViewProps) {
 
                     // Get price level for this row
                     const priceLevel = priceLevelsPerRow[rowIndex];
-
-                    // Check if this specific box is being blasted
                     const boxKey = `${priceLevel}-${marker.time}`;
                     const blastData = blastedBoxes.get(boxKey);
                     const isBlasted = !!blastData;
@@ -676,9 +648,7 @@ export function GameView({ market, userBet }: GameViewProps) {
                         rightEdge >= noBetsZoneEnd);
 
                     // Check if this box is selected (optimized lookup)
-                    const isSelected = selectedBlocksMap.has(
-                      `${priceLevel}-${marker.time}`
-                    );
+                    const isSelected = selectedBlocksMap.has(boxKey);
 
                     // Check if bet is pending
                     const isPending = isPendingBet(priceLevel, marker.time);
