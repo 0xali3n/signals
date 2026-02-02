@@ -190,7 +190,11 @@ export function Header() {
                     {balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
                 </div>
-                <p className="text-[10px] text-slate-400 font-medium">Balance</p>
+                <div className="flex items-center justify-end gap-2">
+                  <p className="text-[10px] text-slate-400 font-medium">Balance</p>
+                  <span className="text-[9px] text-slate-500">•</span>
+                  <p className="text-[10px] text-slate-400">Each bet = <span className="text-orange-400 font-mono font-semibold">100</span></p>
+                </div>
               </div>
 
               <div className="text-right hidden sm:block pr-4 border-r border-orange-500/30">

@@ -245,9 +245,12 @@ export function PriceCanvas({
         const referenceLineX = priceLineX; // No floatOffsetX
         const timeWindow = 240;
         const oneMinuteInSeconds = 60;
-        const oneMinuteLineX =
+        // Reduce betting closed zone width by 20% (make it 80% of original)
+        const originalOneMinuteLineX =
           priceLineX +
           (oneMinuteInSeconds / timeWindow) * (canvas.width - priceLineX);
+        const zoneWidth = originalOneMinuteLineX - referenceLineX;
+        const oneMinuteLineX = referenceLineX + zoneWidth * 0.8;
 
         // Draw fill between lines
         const leftLineX = Math.min(referenceLineX, oneMinuteLineX);
@@ -256,16 +259,16 @@ export function PriceCanvas({
         ctx.fillStyle = "rgba(255, 165, 0, 0.05)";
         ctx.fillRect(leftLineX, 0, fillWidth, canvas.height);
 
-        // Draw "no bets allowed" text
+        // Draw "betting closed" text - friendlier message
         const textX = leftLineX + fillWidth / 2;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
         ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
         ctx.lineWidth = 3;
         ctx.font = "bold 13px system-ui, -apple-system, sans-serif";
-        ctx.strokeText("no bets allowed", textX, 12);
-        ctx.fillStyle = "rgba(255, 165, 0, 0.95)";
-        ctx.fillText("no bets allowed", textX, 12);
+        ctx.strokeText("Betting closed for this round", textX, 12);
+        ctx.fillStyle = "rgba(255, 165, 0, 0.75)";
+        ctx.fillText("Betting closed for this round", textX, 12);
         ctx.textAlign = "start";
         ctx.textBaseline = "alphabetic";
 

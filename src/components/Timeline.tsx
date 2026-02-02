@@ -1,5 +1,5 @@
 // Timeline component for displaying time markers
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState, useRef, useEffect, useCallback, memo } from "react";
 
 interface TimelineProps {
   currentTime: number;
@@ -24,8 +24,53 @@ const TIMELINE_SCROLL_SPEED = 3.5; // Pixels per second (increased for faster mo
 const TIMELINE_POSITION_OFFSET = 0; // Pixels (aligned with canvas)
 
 // 3. TIMELINE_MIN_SPACING: Minimum pixel spacing between visible time markers
-//    - 60 seconds = 120 pixels, so we use 110px to show all markers with slight buffer
-const TIMELINE_MIN_SPACING = 50; // Pixels (reduced to match 20-second intervals: 20s × 2px/s = 40px)
+//    - Reduced for tighter spacing between blocks
+const TIMELINE_MIN_SPACING = 30; // Pixels (reduced from 50 to 30 for tighter gaps)
+
+// Memoized marker component to prevent unnecessary re-renders
+interface TimeMarkerProps {
+  time: number;
+  xPosition: number;
+  showLabel: boolean;
+  timeLabel: string;
+  lineWidth: string;
+  lineClass: string;
+  labelClass: string;
+}
+
+const TimeMarker = memo(function TimeMarker({
+  xPosition,
+  showLabel,
+  timeLabel,
+  lineWidth,
+  lineClass,
+  labelClass,
+}: TimeMarkerProps) {
+  return (
+    <div
+      className="absolute flex flex-col items-center"
+      style={{
+        left: `${xPosition}px`,
+        top: 0,
+        bottom: 0,
+        transform: "translate3d(-50%, 0, 0)",
+        width: "1px",
+      }}
+    >
+      <div className={`absolute top-0 bottom-0 ${lineWidth} ${lineClass}`} />
+      {showLabel && (
+        <div
+          className={`absolute bottom-8 text-[9px] font-mono whitespace-nowrap ${labelClass}`}
+          style={{
+            transform: "translate3d(-50%, 0, 0)",
+          }}
+        >
+          {timeLabel}
+        </div>
+      )}
+    </div>
+  );
+});
 
 export function Timeline({
   currentTime,
@@ -70,9 +115,19 @@ export function Timeline({
     return -timeSinceStart * TIMELINE_SCROLL_SPEED;
   }, [currentTime, viewOffset]);
 
-  // Generate time markers at 20-second intervals
+  // Generate time markers at 20-second intervals with pre-calculated data
   const timeMarkers = useMemo(() => {
-    const markers: Array<{ time: number; xPosition: number }> = [];
+    const markers: Array<{ 
+      time: number; 
+      xPosition: number;
+      adjustedPosition: number;
+      isAtCurrentPosition: boolean;
+      showLabel: boolean;
+      timeLabel: string;
+      lineWidth: string;
+      lineClass: string;
+      labelClass: string;
+    }> = [];
     const now = currentTime + viewOffset * 1000;
     const timeRangeMinutes =
       Math.ceil(containerWidth / (TIMELINE_SCROLL_SPEED * 60)) + 15;
@@ -97,7 +152,38 @@ export function Timeline({
           TIMELINE_MIN_SPACING;
 
       if (isInVisibleRange && hasEnoughSpacing) {
-        markers.push({ time: markerTime, xPosition });
+        // Pre-calculate all marker properties to avoid doing it in render
+        const isAtCurrentPosition = Math.abs(adjustedPosition - nowPixelPosition) < 60;
+        
+        // Pre-calculate label data
+        const markerDate = new Date(markerTime);
+        const seconds = markerDate.getSeconds();
+        const minutes = markerDate.getMinutes();
+        const showLabel = seconds === 0 || isAtCurrentPosition;
+        const timeLabel = showLabel 
+          ? `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+          : '';
+
+        // Pre-calculate classes
+        const lineWidth = isAtCurrentPosition ? 'w-[1px]' : 'w-[0.5px]';
+        const lineClass = isAtCurrentPosition
+          ? 'bg-orange-500/60 shadow-[0_0_4px_rgba(251,146,60,0.5)]'
+          : 'bg-orange-500/20';
+        const labelClass = isAtCurrentPosition
+          ? 'text-orange-400 font-semibold'
+          : 'text-orange-500/60';
+
+        markers.push({ 
+          time: markerTime, 
+          xPosition,
+          adjustedPosition,
+          isAtCurrentPosition,
+          showLabel,
+          timeLabel,
+          lineWidth,
+          lineClass,
+          labelClass,
+        });
         lastVisiblePosition = adjustedPosition;
       }
 
@@ -119,64 +205,68 @@ export function Timeline({
     startTimeRef.current = currentTime;
   }, [currentTime]);
 
-  // Navigation handlers
-  const handleForward = () => {
+  // Navigation handlers - memoized to prevent re-renders
+  const handleForward = useCallback(() => {
     const newOffset = viewOffset + 60;
     setViewOffset(newOffset); // Move forward 1 minute
     startTimeRef.current = currentTime + newOffset * 1000;
-  };
+  }, [viewOffset, currentTime, setViewOffset]);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     const newOffset = viewOffset - 60;
     setViewOffset(newOffset); // Move back 1 minute
     startTimeRef.current = currentTime + newOffset * 1000;
-  };
+  }, [viewOffset, currentTime, setViewOffset]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setViewOffset(0); // Reset to live time
     startTimeRef.current = currentTime;
-  };
+  }, [currentTime, setViewOffset]);
 
   return (
     <div className="absolute bottom-0 left-0 right-0 h-36 border-t border-orange-500/30 bg-gradient-to-t from-black/95 via-black/80 to-black/40 z-30 overflow-hidden">
       <div ref={containerRef} className="relative w-full h-full">
+        {/* Subtle grid background for better depth perception */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-orange-500/20" />
+        </div>
         {/* Background grid lines removed - only show timeline markers */}
+
+        {/* NOW indicator - fixed position */}
+        <div
+          className="absolute top-0 bottom-0 pointer-events-none z-30 flex flex-col items-center"
+          style={{
+            left: `${nowPixelPosition}px`,
+            transform: "translate3d(-50%, 0, 0)",
+            width: "2px",
+          }}
+        >
+          <div className="absolute top-0 bottom-0 w-[2px] bg-orange-500 shadow-[0_0_8px_rgba(251,146,60,0.6)]" />
+          <div className="absolute top-2 bg-orange-500/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-mono font-bold text-white shadow-lg border border-orange-400/50">
+            NOW
+          </div>
+        </div>
 
         {/* Scrolling time markers container */}
         <div
           className="absolute top-0 left-0 right-0 h-full pointer-events-none z-20"
           style={{
-            transform: `translateX(${scrollOffset}px)`,
+            transform: `translate3d(${scrollOffset}px, 0, 0)`,
             willChange: "transform",
           }}
         >
-          {timeMarkers.map((marker) => {
-            const adjustedPosition = marker.xPosition + scrollOffset;
-            const isAtCurrentPosition =
-              Math.abs(adjustedPosition - nowPixelPosition) < 60;
-
-            return (
-              <div
-                key={`marker-${marker.time}`}
-                className="absolute flex flex-col items-center"
-                style={{
-                  left: `${marker.xPosition}px`,
-                  top: 0,
-                  bottom: 0,
-                  transform: "translateX(-50%)",
-                  width: "1px",
-                }}
-              >
-                <div
-                  className={`absolute top-0 bottom-0 ${
-                    isAtCurrentPosition
-                      ? "w-[0.5px] bg-orange-500/40"
-                      : "w-[0.5px] bg-orange-500/15"
-                  }`}
-                />
-              </div>
-            );
-          })}
+          {timeMarkers.map((marker) => (
+            <TimeMarker
+              key={`marker-${marker.time}`}
+              time={marker.time}
+              xPosition={marker.xPosition}
+              showLabel={marker.showLabel}
+              timeLabel={marker.timeLabel}
+              lineWidth={marker.lineWidth}
+              lineClass={marker.lineClass}
+              labelClass={marker.labelClass}
+            />
+          ))}
         </div>
 
         {/* Navigation controls - professional styling */}

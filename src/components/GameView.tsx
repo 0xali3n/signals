@@ -105,8 +105,8 @@ export function GameView({ market, userBet }: GameViewProps) {
         );
         setMaxSelectionError(null);
       } else {
-        // Select: check if column already has 3 selections
-        if (selectedInColumn < 3) {
+        // Select: check if column already has 5 selections
+        if (selectedInColumn < 5) {
           const betKey = `${priceLevel}-${timestamp}`;
 
           // Add to pending bets
@@ -141,7 +141,7 @@ export function GameView({ market, userBet }: GameViewProps) {
         } else {
           // Show error message
           setMaxSelectionError(
-            `Maximum 3 boxes can be selected per column in one game`
+            `Maximum 5 boxes can be selected per column in one game`
           );
           // Auto-hide after 3 seconds
           setTimeout(() => setMaxSelectionError(null), 3000);
@@ -339,9 +339,12 @@ export function GameView({ market, userBet }: GameViewProps) {
 
     const timeWindow = 240; // 4 minutes in seconds
     const oneMinuteInSeconds = 60;
-    const oneMinuteLineX =
+    // Reduce betting closed zone width by 20% (make it 80% of original)
+    const originalOneMinuteLineX =
       priceLineX +
       (oneMinuteInSeconds / timeWindow) * (availableWidth - priceLineX);
+    const zoneWidth = originalOneMinuteLineX - priceLineX;
+    const oneMinuteLineX = priceLineX + zoneWidth * 0.8;
     const oneMinuteLineXAbsolute = priceCanvasOffset + oneMinuteLineX;
 
     return { referenceLineX, oneMinuteLineX: oneMinuteLineXAbsolute };
@@ -642,12 +645,12 @@ export function GameView({ market, userBet }: GameViewProps) {
                   const betAmount = 100; // Fixed bet amount per block
 
                   if (isSelected) {
-                    // WIN: Add double the bet amount (2x return)
-                    const winReward = betAmount * 2;
+                    // WIN: Add 5x the bet amount (5x return)
+                    const winReward = betAmount * 5;
                     updateBalance(winReward);
                     setGameResult({
                       type: "win",
-                      message: `You Win! +${winReward} tokens`,
+                      message: `You Win! +${winReward} tokens (5x)`,
                       timestamp: performance.now(),
                     });
                   } else {
@@ -946,13 +949,13 @@ export function GameView({ market, userBet }: GameViewProps) {
                       opacity = breakPhase < 1 ? 1 : 1 - fadePhase;
                       cursor = "default";
                     } else if (isInNoBetsZone) {
-                      // "No bets allowed" state: greyed out but with subtle glow
-                      borderOpacity = 0.35;
+                      // "Betting closed" state: dimmed but still visible
+                      borderOpacity = 0.25;
                       bgOpacity = 0.05;
-                      boxShadow = "0 0 4px rgba(251, 146, 60, 0.2)";
+                      boxShadow = "0 0 3px rgba(251, 146, 60, 0.15)";
                       transform = "translateX(-50%)";
                       cursor = "not-allowed";
-                      opacity = 1;
+                      opacity = 0.5; // More visible while still showing inactive state
                     } else if (isSelected) {
                       // Selected state: professional, clean, minimal
                       borderOpacity = 0.9;
@@ -964,7 +967,7 @@ export function GameView({ market, userBet }: GameViewProps) {
                     } else {
                       // Normal state
                       // If column is at max selections, make it slightly dimmer
-                      const isColumnAtMax = selectedInColumn >= 3;
+                      const isColumnAtMax = selectedInColumn >= 5;
                       borderOpacity = isColumnAtMax
                         ? 0.3 + opacityFactor * 0.2
                         : 0.5 + opacityFactor * 0.3; // 0.5 to 0.8
@@ -1062,7 +1065,7 @@ export function GameView({ market, userBet }: GameViewProps) {
                           if (
                             !isInNoBetsZone &&
                             !isSelected &&
-                            selectedInColumn < 3
+                            selectedInColumn < 5
                           ) {
                             e.currentTarget.style.borderColor =
                               "rgba(251, 146, 60, 0.8)";
@@ -1446,7 +1449,7 @@ export function GameView({ market, userBet }: GameViewProps) {
       <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-30 pointer-events-none">
         <div className="px-4 py-2 bg-black/70 backdrop-blur-md rounded-lg border border-orange-500/20">
           <p className="text-xs text-slate-300 text-center font-medium">
-            Maximum 3 boxes per column • Click to select • Drag to pan • Double-click to reset
+            Maximum 5 boxes per column • Win 5x if price hits • Click to select • Drag to pan • Double-click to reset
           </p>
         </div>
       </div>
