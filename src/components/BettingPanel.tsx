@@ -1,17 +1,5 @@
 // Betting panel component for GameView
-interface BettingPanelProps {
-  market: {
-    isClosed: boolean;
-    endTime: number;
-  };
-  userBet?: {
-    direction: string;
-    amount: number;
-    claimed: boolean;
-  };
-}
-
-export function BettingPanel({}: BettingPanelProps) {
+export function BettingPanel() {
   // Simplified panel - market is always open for MVP
   return (
     <div className="absolute bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl border-t border-orange-500/20 z-30">

@@ -304,8 +304,8 @@ export function PriceCanvas({
 
           // Horizontal line - clean
           const lineWave = 0;
-          ctx.strokeStyle = "#F4C430";
-          ctx.lineWidth = 1;
+        ctx.strokeStyle = "#F4C430";
+        ctx.lineWidth = 1;
           ctx.shadowBlur = 0;
         ctx.beginPath();
         ctx.moveTo(indicatorX - 15, indicatorY + lineWave);

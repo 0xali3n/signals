@@ -8,7 +8,7 @@ interface PriceScaleProps {
 export function PriceScale({ currentPrice, targetPrice, panY = 0 }: PriceScaleProps) {
   const basePrice = (targetPrice ?? currentPrice) + panY;
   const priceIncrement = 10;
-  const numIncrements = 7;
+  const numIncrements = 7; // 7 increments = 15 visible price levels
   const startPrice = basePrice - numIncrements * priceIncrement;
 
   // Generate prices

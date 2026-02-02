@@ -363,10 +363,11 @@ export function GameView({ market, userBet }: GameViewProps) {
   }, [containerHeight]);
 
   // Calculate price level for each row (for betting blocks)
+  // Show 15 visible rows, but use larger range for calculations to prevent out-of-bounds
   const priceLevelsPerRow = useMemo(() => {
     const centerPrice = (initialLivePrice ?? market.targetPrice) + panY;
     const priceIncrement = 10; // Fixed increment
-    const numIncrements = 7; // Fixed number of increments
+    const numIncrements = 7; // 7 increments = 15 rows (7 above + 7 below + 1 center)
     
     // Calculate price for each row (15 rows, highest at top)
     const prices: number[] = [];
@@ -504,7 +505,7 @@ export function GameView({ market, userBet }: GameViewProps) {
     // Use same calculation as priceLevelsPerRow to account for panY
     const centerPrice = (initialLivePrice ?? market.targetPrice) + panY;
     const priceIncrement = 10;
-    const numIncrements = 7;
+    const numIncrements = 7; // Match priceLevelsPerRow
 
     // Find which row the current price corresponds to (matching priceLevelsPerRow logic)
     for (let i = 0; i < 15; i++) {
@@ -550,7 +551,13 @@ export function GameView({ market, userBet }: GameViewProps) {
     // Throttle checks to reduce CPU usage
     const checkInterval = setInterval(() => {
       const avgBoxWidth = TIMELINE_MIN_SPACING * 0.85 * 0.85;
-      const priceLevel = priceLevelsPerRow[currentPriceRowIndex];
+
+      // Calculate the actual Y position of the price line (matching PriceCanvas calculation)
+      const timelineHeight = 144; // 9rem (bottom-36) in pixels
+      const canvasHeight = containerHeight - timelineHeight;
+      const canvasMinPrice = priceScale.minPrice;
+      const canvasPriceRange = priceScale.priceRange;
+      const priceLineY = canvasHeight - ((currentPrice - canvasMinPrice) / canvasPriceRange) * canvasHeight;
 
       // Only check markers near the live price line (optimization)
       const checkRange = hitThreshold + avgBoxWidth;
@@ -570,89 +577,109 @@ export function GameView({ market, userBet }: GameViewProps) {
           distanceFromLine <= hitThreshold &&
           distanceFromLine >= -hitThreshold
         ) {
-          const boxKey = `${priceLevel}-${marker.time}`;
-
           // CRITICAL: Only allow one hit per column (timestamp)
           // If this column has already been hit, skip it
           if (hitColumns.has(marker.time)) {
             return; // Column already hit, skip
           }
 
-          // Check if this specific box hasn't been blasted yet
-          if (!blastedBoxesRef.current.has(boxKey)) {
-            // Mark this column as hit with current time - prevents other blocks in same column from being hit
-            // This allows us to delay hiding blocks for 1-2 seconds
-            setHitColumns((prev) => {
-              const newMap = new Map(prev);
-              newMap.set(marker.time, performance.now());
-              return newMap;
-            });
+          // Find which row/block is closest to the price line Y position
+          // Check all rows to find the block whose Y position is closest to priceLineY
+          let closestRowIndex = -1;
+          let closestDistance = Infinity;
 
-            // Check if this box is selected
-            const isSelected = selectedBlocksMapRef.current.has(boxKey);
-
-            // Check if user has selected any boxes in this column (has played)
-            const hasPlayedInColumn =
-              (selectedCountByTimestampRef.current.get(marker.time) ?? 0) > 0;
-
-            // Trigger blast animation for this specific box only
-            setBlastedBoxes((prev) => {
-              const newMap = new Map(prev);
-              newMap.set(boxKey, {
-                startTime: performance.now(),
-                priceLevel,
-                timestamp: marker.time,
-                isSelected,
-              });
-              return newMap;
-            });
-
-            // Only show win/lose notification if user has played in this column
-            if (hasPlayedInColumn) {
-              // Process win/lose only once per box
-              if (!processedWinsRef.current.has(boxKey)) {
-                processedWinsRef.current.add(boxKey);
-
-                const betAmount = 100; // Fixed bet amount per block
-
-                if (isSelected) {
-                  // WIN: Add double the bet amount (2x return)
-                  const winReward = betAmount * 2;
-                  updateBalance(winReward);
-                  setGameResult({
-                    type: "win",
-                    message: `You Win! +${winReward} tokens`,
-                    timestamp: performance.now(),
-                  });
-                } else {
-                  // LOSE: Do nothing (balance already deducted when bet was placed)
-                  setGameResult({
-                    type: "lose",
-                    message: `You Lose -${betAmount} tokens`,
-                    timestamp: performance.now(),
-                  });
-                }
-              }
-
-              // Auto-hide notification after 2.5 seconds
-              setTimeout(() => {
-                setGameResult(null);
-              }, 2500);
+          horizontalLinePositions.slice(0, -1).forEach((rowTop, rowIndex) => {
+            const rowBottom = horizontalLinePositions[rowIndex + 1];
+            const rowCenterY = rowTop + (rowBottom - rowTop) / 2;
+            const distance = Math.abs(rowCenterY - priceLineY);
+            
+            if (distance < closestDistance) {
+              closestDistance = distance;
+              closestRowIndex = rowIndex;
             }
+          });
 
-            // Trigger price line pulse animation
-            setPriceLinePulse(1);
-            setTimeout(() => setPriceLinePulse(0), 200);
+          // If we found a valid row, hit that block
+          if (closestRowIndex >= 0 && closestRowIndex < priceLevelsPerRow.length) {
+            const priceLevel = priceLevelsPerRow[closestRowIndex];
+            const boxKey = `${priceLevel}-${marker.time}`;
 
-            // Remove blasted box after animation completes
-            // Keep the hit block visible for full 2.5 seconds so users can see the animation
-            setTimeout(() => {
-              setBlastedBoxes((prev) => {
+            // Check if this specific box hasn't been blasted yet
+            if (!blastedBoxesRef.current.has(boxKey)) {
+              // Mark this column as hit with current time - prevents other blocks in same column from being hit
+              // This allows us to delay hiding blocks for 1-2 seconds
+              setHitColumns((prev) => {
                 const newMap = new Map(prev);
-                newMap.delete(boxKey);
+                newMap.set(marker.time, performance.now());
                 return newMap;
               });
-            }, blastDuration); // 2.5 seconds total for full animation visibility
+
+              // Check if this box is selected
+              const isSelected = selectedBlocksMapRef.current.has(boxKey);
+
+              // Check if user has selected any boxes in this column (has played)
+              const hasPlayedInColumn =
+                (selectedCountByTimestampRef.current.get(marker.time) ?? 0) > 0;
+
+              // Trigger blast animation for this specific box only
+              setBlastedBoxes((prev) => {
+                const newMap = new Map(prev);
+                newMap.set(boxKey, {
+                  startTime: performance.now(),
+                  priceLevel,
+                  timestamp: marker.time,
+                  isSelected,
+                });
+                return newMap;
+              });
+
+              // Only show win/lose notification if user has played in this column
+              if (hasPlayedInColumn) {
+                // Process win/lose only once per box
+                if (!processedWinsRef.current.has(boxKey)) {
+                  processedWinsRef.current.add(boxKey);
+
+                  const betAmount = 100; // Fixed bet amount per block
+
+                  if (isSelected) {
+                    // WIN: Add double the bet amount (2x return)
+                    const winReward = betAmount * 2;
+                    updateBalance(winReward);
+                    setGameResult({
+                      type: "win",
+                      message: `You Win! +${winReward} tokens`,
+                      timestamp: performance.now(),
+                    });
+                  } else {
+                    // LOSE: Do nothing (balance already deducted when bet was placed)
+                    setGameResult({
+                      type: "lose",
+                      message: `You Lose -${betAmount} tokens`,
+                      timestamp: performance.now(),
+                    });
+                  }
+                }
+
+                // Auto-hide notification after 2.5 seconds
+                setTimeout(() => {
+                  setGameResult(null);
+                }, 2500);
+              }
+
+              // Trigger price line pulse animation
+              setPriceLinePulse(1);
+              setTimeout(() => setPriceLinePulse(0), 200);
+
+              // Remove blasted box after animation completes
+              // Keep the hit block visible for full 2.5 seconds so users can see the animation
+              setTimeout(() => {
+                setBlastedBoxes((prev) => {
+                  const newMap = new Map(prev);
+                  newMap.delete(boxKey);
+                  return newMap;
+                });
+              }, blastDuration); // 2.5 seconds total for full animation visibility
+            }
           }
         }
       });
@@ -663,9 +690,13 @@ export function GameView({ market, userBet }: GameViewProps) {
     timelineMarkers,
     timelineScrollOffset,
     nowPixelPosition,
-    currentPriceRowIndex,
     priceLevelsPerRow,
+    horizontalLinePositions,
+    priceScale,
+    currentPrice,
+    containerHeight,
     updateBalance,
+    hitColumns,
   ]);
 
   return (
@@ -1398,7 +1429,7 @@ export function GameView({ market, userBet }: GameViewProps) {
       )}
 
       {/* Betting Panel */}
-      <BettingPanel market={market} userBet={userBet} />
+      <BettingPanel />
 
       {/* Error message for max selections */}
       {maxSelectionError && (
