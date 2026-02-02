@@ -9,6 +9,13 @@ import { BettingPanel } from "./BettingPanel";
 import { usePriceScale } from "../hooks/usePriceScale";
 import { useMarket } from "../hooks/useMarket";
 import { useWalletStore } from "../store/walletStore";
+import { 
+  getSelectedBlocks, 
+  saveSelectedBlocks, 
+  addBettingHistory, 
+  updateBettingHistory,
+  type BettingHistoryEntry 
+} from "../utils/bettingHistory";
 
 interface GameViewProps {
   market: Market;
@@ -26,14 +33,14 @@ interface PricePoint {
 
 export function GameView({ market, userBet }: GameViewProps) {
   const { placeBet } = useMarket();
-  const { updateBalance } = useWalletStore();
+  const { updateBalance, wallet } = useWalletStore();
   const processedWinsRef = useRef<Set<string>>(new Set()); // Track processed wins to avoid duplicate rewards
   const [currentPrice, setCurrentPrice] = useState(market.targetPrice);
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [containerWidth, setContainerWidth] = useState(1920);
   const [containerHeight, setContainerHeight] = useState(1080);
-  const [viewOffset, setViewOffset] = useState(0); // Timeline navigation offset
+  const [viewOffset] = useState(0); // Timeline navigation offset (kept for compatibility)
   const containerRef = useRef<HTMLDivElement>(null);
   const startTimeRef = useRef<number>(Date.now());
   // Store initial live price for fixed price scale (centered on this price)
@@ -50,7 +57,13 @@ export function GameView({ market, userBet }: GameViewProps) {
       timestamp: number;
       betId?: string; // Track bet ID if placed on-chain
     }>
-  >([]);
+  >(() => {
+    // Restore from localStorage on mount (by wallet address)
+    if (wallet?.address) {
+      return getSelectedBlocks(wallet.address);
+    }
+    return [];
+  });
   // Error message for max selections
   const [maxSelectionError, setMaxSelectionError] = useState<string | null>(
     null
@@ -73,6 +86,9 @@ export function GameView({ market, userBet }: GameViewProps) {
   // Track which columns (timestamps) have been hit - only one hit per column
   // Map: timestamp -> hitTime (when it was hit)
   const [hitColumns, setHitColumns] = useState<Map<number, number>>(new Map());
+  // Track winning and losing blocks after round ends
+  // Map: boxKey -> { isWin: boolean, timestamp: number }
+  const [resultBlocks, setResultBlocks] = useState<Map<string, { isWin: boolean; timestamp: number }>>(new Map());
   // Track price line animation when hitting boxes
   const [priceLinePulse, setPriceLinePulse] = useState(0);
   // Track win/lose notifications
@@ -81,6 +97,19 @@ export function GameView({ market, userBet }: GameViewProps) {
     message: string;
     timestamp: number;
   } | null>(null);
+  // Track first-time user onboarding
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  // Track floating win text animations
+  const [floatingTexts, setFloatingTexts] = useState<Array<{
+    id: string;
+    x: number;
+    y: number;
+    amount: number;
+    isWin: boolean;
+    startTime: number;
+  }>>([]);
+  // Track active column (current betting column) for emphasis
+  const [activeColumnTimestamp, setActiveColumnTimestamp] = useState<number | null>(null);
 
   // Memoized click handler - now places bets when selecting boxes
   const handleBoxClick = useCallback(
@@ -95,14 +124,18 @@ export function GameView({ market, userBet }: GameViewProps) {
 
       if (isSelected) {
         // Unselect: remove from array (and cancel bet if placed)
-        setSelectedBlocks((prev) =>
-          prev.filter(
+        setSelectedBlocks((prev) => {
+          const updated = prev.filter(
             (block) =>
               !(
                 block.priceLevel === priceLevel && block.timestamp === timestamp
               )
-          )
-        );
+          );
+          if (wallet?.address) {
+            saveSelectedBlocks(wallet.address, updated); // Persist to localStorage by wallet
+          }
+          return updated;
+        });
         setMaxSelectionError(null);
       } else {
         // Select: check if column already has 5 selections
@@ -117,11 +150,27 @@ export function GameView({ market, userBet }: GameViewProps) {
             const betAmount = 100; // Fixed 100 tokens per block
             const bet = await placeBet(priceLevel, timestamp, betAmount);
 
-            // Add to selected blocks with bet ID
-            setSelectedBlocks((prev) => [
-              ...prev,
-              { priceLevel, timestamp, betId: bet.id },
-            ]);
+            // Create history entry with wallet address
+            if (wallet?.address) {
+              const historyEntry: BettingHistoryEntry = {
+                id: bet.id,
+                walletAddress: wallet.address,
+                priceLevel,
+                timestamp,
+                betAmount,
+                betTime: Date.now(),
+                result: 'pending',
+              };
+              addBettingHistory(historyEntry);
+
+              // Add to selected blocks with bet ID
+              const newBlock = { priceLevel, timestamp, betId: bet.id };
+              setSelectedBlocks((prev) => {
+                const updated = [...prev, newBlock];
+                saveSelectedBlocks(wallet.address, updated); // Persist to localStorage by wallet
+                return updated;
+              });
+            }
             setMaxSelectionError(null);
           } catch (error) {
             // Failed to place bet - error handled by UI
@@ -242,6 +291,52 @@ export function GameView({ market, userBet }: GameViewProps) {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
+  // Show onboarding for first-time users
+  useEffect(() => {
+    const hasSeenOnboarding = localStorage.getItem('signals-onboarding-seen');
+    if (!hasSeenOnboarding) {
+      // Show onboarding after a short delay to let UI render
+      const timer = setTimeout(() => {
+        setShowOnboarding(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Clean up floating texts after animation
+  useEffect(() => {
+    if (floatingTexts.length === 0) return;
+    
+    const interval = setInterval(() => {
+      setFloatingTexts((prev) => {
+        const now = performance.now();
+        return prev.filter(t => (now - t.startTime) / 1000 < 2);
+      });
+    }, 100);
+    
+    return () => clearInterval(interval);
+  }, [floatingTexts]);
+
+  // Green flash effect on win
+  const [greenFlash, setGreenFlash] = useState(false);
+  useEffect(() => {
+    if (gameResult?.type === 'win') {
+      setGreenFlash(true);
+      const timer = setTimeout(() => setGreenFlash(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [gameResult]);
+
+  // Auto-hide win/lose popup after 3.5 seconds of display
+  useEffect(() => {
+    if (gameResult) {
+      const timer = setTimeout(() => {
+        setGameResult(null);
+      }, 3500); // Show for 3.5 seconds after appearing
+      return () => clearTimeout(timer);
+    }
+  }, [gameResult]);
+
 
   // TradingView-style pan: click and drag to move price view
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -352,8 +447,10 @@ export function GameView({ market, userBet }: GameViewProps) {
 
   // Calculate horizontal grid line positions (matching PriceCanvas grid)
   const horizontalLinePositions = useMemo(() => {
-    const timelineHeight = 144; // 9rem (bottom-36) in pixels
-    const canvasHeight = containerHeight - timelineHeight;
+    const timelineHeight = 128; // 8rem (h-32) in pixels
+    const timelineBottomOffset = 32; // Footer moved down (bottom-8 = 32px)
+    const bettingPanelHeight = 56; // Betting panel height (py-2.5 + content)
+    const canvasHeight = containerHeight - timelineHeight - bettingPanelHeight - timelineBottomOffset;
 
     // Calculate 15 horizontal lines (matching PriceCanvas grid)
     const lines: number[] = [];
@@ -556,8 +653,9 @@ export function GameView({ market, userBet }: GameViewProps) {
       const avgBoxWidth = TIMELINE_MIN_SPACING * 0.85 * 0.85;
 
       // Calculate the actual Y position of the price line (matching PriceCanvas calculation)
-      const timelineHeight = 144; // 9rem (bottom-36) in pixels
-      const canvasHeight = containerHeight - timelineHeight;
+      const timelineHeight = 128; // 8rem (h-32) in pixels
+      const bettingPanelHeight = 56; // Betting panel height (py-2.5 + content)
+      const canvasHeight = containerHeight - timelineHeight - bettingPanelHeight;
       const canvasMinPrice = priceScale.minPrice;
       const canvasPriceRange = priceScale.priceRange;
       const priceLineY = canvasHeight - ((currentPrice - canvasMinPrice) / canvasPriceRange) * canvasHeight;
@@ -607,8 +705,13 @@ export function GameView({ market, userBet }: GameViewProps) {
             const priceLevel = priceLevelsPerRow[closestRowIndex];
             const boxKey = `${priceLevel}-${marker.time}`;
 
-            // Check if this specific box hasn't been blasted yet
+              // Check if this specific box hasn't been blasted yet
             if (!blastedBoxesRef.current.has(boxKey)) {
+              // Set active column for emphasis
+              setActiveColumnTimestamp(marker.time);
+              // Clear after 1 second
+              setTimeout(() => setActiveColumnTimestamp(null), 1000);
+              
               // Mark this column as hit with current time - prevents other blocks in same column from being hit
               // This allows us to delay hiding blocks for 1-2 seconds
               setHitColumns((prev) => {
@@ -638,35 +741,144 @@ export function GameView({ market, userBet }: GameViewProps) {
 
               // Only show win/lose notification if user has played in this column
               if (hasPlayedInColumn) {
-                // Process win/lose only once per box
-                if (!processedWinsRef.current.has(boxKey)) {
-                  processedWinsRef.current.add(boxKey);
+                // Process win/lose only once per column (not per box)
+                const columnProcessedKey = `column-${marker.time}`;
+                if (!processedWinsRef.current.has(columnProcessedKey)) {
+                  processedWinsRef.current.add(columnProcessedKey);
 
                   const betAmount = 100; // Fixed bet amount per block
+                  
+                  // Find the specific hit block in selected blocks
+                  const hitBlock = selectedBlocks.find(
+                    (block) => block.priceLevel === priceLevel && block.timestamp === marker.time
+                  );
+                  
+                  // Count all user's selected blocks in this column (for checking if user played)
+                  const userSelectedInColumn = selectedBlocks.filter(
+                    (block) => block.timestamp === marker.time
+                  );
+                  const totalBlocksSelected = userSelectedInColumn.length;
 
-                  if (isSelected) {
-                    // WIN: Add 5x the bet amount (5x return)
-                    const winReward = betAmount * 5;
-                    updateBalance(winReward);
-                    setGameResult({
-                      type: "win",
-                      message: `You Win! +${winReward} tokens (5x)`,
-                      timestamp: performance.now(),
+                  if (isSelected && hitBlock) {
+                    // WIN: Calculate for the hit block only
+                    const blockInvestment = betAmount; // 100 tokens per block
+                    const blockOutput = blockInvestment * 5; // 500 tokens (5x return)
+                    const blockNetGain = blockOutput - blockInvestment; // 400 tokens net gain
+                    
+                    // Update balance with the hit block's payout (input was already deducted when bet was placed)
+                    updateBalance(blockOutput); // Add 500 tokens for this block
+                    
+                    // Add floating "+500" text for the hit block
+                    const blockRowIndex = priceLevelsPerRow.findIndex(p => Math.abs(p - priceLevel) < 5);
+                    if (blockRowIndex >= 0) {
+                      const rowTop = horizontalLinePositions[blockRowIndex];
+                      const rowBottom = horizontalLinePositions[blockRowIndex + 1];
+                      const blockY = rowTop + (rowBottom - rowTop) / 2;
+                      const adjustedX = marker.xPosition + timelineScrollOffset;
+                      
+                      setFloatingTexts((prev) => [
+                        ...prev,
+                        {
+                          id: `win-${priceLevel}-${marker.time}-${performance.now()}`,
+                          x: adjustedX,
+                          y: blockY,
+                          amount: 500, // Per block win
+                          isWin: true,
+                          startTime: performance.now(),
+                        },
+                      ]);
+                    }
+                    
+                    // Delay showing win popup until after block breaking animation completes (2.5 seconds)
+                    // This creates a better user experience - let them see the animation first
+                    setTimeout(() => {
+                      setGameResult({
+                        type: "win",
+                        message: `You Win! Invested: ${blockInvestment} → Got: ${blockOutput} (Net: +${blockNetGain})`,
+                        timestamp: performance.now(),
+                      });
+                    }, 2500); // Wait for full block breaking animation (2.5 seconds)
+                    
+                    // Update history for the hit block only
+                    if (wallet?.address && hitBlock.betId) {
+                      const payout = 500; // Per block payout
+                      const netGain = payout - 100; // Net gain per block (500 - 100 = 400)
+                      updateBettingHistory(hitBlock.betId, wallet.address, {
+                        result: 'win',
+                        actualPrice: currentPrice,
+                        payout: payout,
+                        netGain: netGain,
+                      });
+                    }
+                    
+                    // Mark only the hit block as win
+                    setResultBlocks((prev) => {
+                      const newMap = new Map(prev);
+                      newMap.set(boxKey, { isWin: true, timestamp: performance.now() });
+                      return newMap;
                     });
                   } else {
-                    // LOSE: Do nothing (balance already deducted when bet was placed)
-                    setGameResult({
-                      type: "lose",
-                      message: `You Lose -${betAmount} tokens`,
-                      timestamp: performance.now(),
-                    });
+                    // LOSE: User had bets in this column but the hit block wasn't selected
+                    if (totalBlocksSelected > 0) {
+                      // Find the losing blocks (all selected blocks in column except the hit one, if it was selected)
+                      const losingBlocks = userSelectedInColumn.filter(
+                        (block) => !(block.priceLevel === priceLevel && block.timestamp === marker.time)
+                      );
+                      
+                      // Update history for losing blocks in this column
+                      if (wallet?.address) {
+                        losingBlocks.forEach((block) => {
+                          if (block.betId) {
+                            updateBettingHistory(block.betId, wallet.address, {
+                              result: 'lose',
+                              actualPrice: currentPrice,
+                              netGain: -100, // Lost the bet
+                            });
+                          }
+                        });
+                      }
+                      
+                      // Track losing blocks
+                      losingBlocks.forEach((block) => {
+                        const loseBoxKey = `${block.priceLevel}-${block.timestamp}`;
+                        setResultBlocks((prev) => {
+                          const newMap = new Map(prev);
+                          if (!newMap.has(loseBoxKey)) {
+                            newMap.set(loseBoxKey, { isWin: false, timestamp: performance.now() });
+                          }
+                          return newMap;
+                        });
+                      });
+                      
+                      // Mark the hit block as lose (if user didn't select it)
+                      if (!isSelected) {
+                        setResultBlocks((prev) => {
+                          const newMap = new Map(prev);
+                          newMap.set(boxKey, { isWin: false, timestamp: performance.now() });
+                          return newMap;
+                        });
+                        
+                        // Show lose notification only if user had bets in this column
+                        // Delay showing lose popup until after block breaking animation completes
+                        const totalLosingInvestment = losingBlocks.length * betAmount;
+                        if (totalLosingInvestment > 0) {
+                          setTimeout(() => {
+                            setGameResult({
+                              type: "lose",
+                              message: `You Lose! Invested: ${totalLosingInvestment} → Lost: -${totalLosingInvestment}`,
+                              timestamp: performance.now(),
+                            });
+                          }, 2500); // Wait for full block breaking animation (2.5 seconds)
+                        }
+                      }
+                    }
                   }
                 }
 
-                // Auto-hide notification after 2.5 seconds
-                setTimeout(() => {
-                  setGameResult(null);
-                }, 2500);
+                // Auto-hide notification after showing (3 seconds display time)
+                // Since popup appears after 2.5s delay, total time is 2.5s + 3s = 5.5s
+                // But we track it per result, so we'll clear it after 3 seconds of display
+                // The timeout is handled in the popup display logic
               }
 
               // Trigger price line pulse animation
@@ -675,6 +887,7 @@ export function GameView({ market, userBet }: GameViewProps) {
 
               // Remove blasted box after animation completes
               // Keep the hit block visible for full 2.5 seconds so users can see the animation
+              // After blast animation, the block will show win/lose state if it has one
               setTimeout(() => {
                 setBlastedBoxes((prev) => {
                   const newMap = new Map(prev);
@@ -705,36 +918,36 @@ export function GameView({ market, userBet }: GameViewProps) {
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black overflow-hidden select-none"
+      className="relative w-full h-screen bg-black overflow-hidden select-none transition-colors duration-300"
       style={{
         userSelect: 'none',
         WebkitUserSelect: 'none',
         MozUserSelect: 'none',
-        msUserSelect: 'none'
+        msUserSelect: 'none',
+        backgroundColor: greenFlash ? 'rgba(20, 83, 45, 0.2)' : undefined,
       }}
     >
-      {/* Grid overlay */}
+      {/* Subtle grid overlay - minimal for clean look */}
       <div
-        className="absolute inset-0 opacity-10"
+        className="absolute inset-0 opacity-[0.02]"
         style={{
           backgroundImage: `
-          linear-gradient(rgba(251, 146, 60, 0.1) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(251, 146, 60, 0.1) 1px, transparent 1px)
+          linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px)
         `,
           backgroundSize: "40px 40px",
         }}
       />
 
-      {/* Full-screen vertical and horizontal reference lines */}
+      {/* Horizontal reference lines - subtle and clean */}
       <div className="absolute inset-0 pointer-events-none z-[5]">
-        {/* Horizontal grid lines - extending full screen width */}
         {horizontalLinePositions.map((y, index) => (
           <div
             key={`horizontal-${index}`}
-            className="absolute left-0 right-0 h-[1px]"
+            className="absolute left-0 right-0 h-[0.5px]"
             style={{
               top: `${y}px`,
-              backgroundColor: "rgba(251, 146, 60, 0.08)",
+              backgroundColor: "rgba(255, 255, 255, 0.03)",
             }}
           />
         ))}
@@ -784,12 +997,16 @@ export function GameView({ market, userBet }: GameViewProps) {
 
                     // Hide all other blocks in this column if column has been hit
                     // Wait 2.5 seconds (2500ms) before hiding blocks to let user see the full animation
+                    // BUT: Don't hide blocks that have win/lose state (they should remain visible)
                     const columnHitTime = hitColumns.get(marker.time);
                     if (columnHitTime && !isBlasted) {
                       const timeSinceHit = performance.now() - columnHitTime;
                       const hideDelay = 2500; // 2.5 seconds delay - matches animation duration
-                      if (timeSinceHit >= hideDelay) {
-                        return false; // Hide other blocks in hit column after delay
+                      // Check if this block has a result (win/lose) - if so, keep it visible
+                      const resultData = resultBlocks.get(boxKey);
+                      const hasResult = resultData !== undefined;
+                      if (timeSinceHit >= hideDelay && !hasResult) {
+                        return false; // Hide other blocks in hit column after delay (unless they have win/lose state)
                       }
                       // Keep blocks visible during the delay period so users can see the animation
                     }
@@ -837,15 +1054,32 @@ export function GameView({ market, userBet }: GameViewProps) {
                     const selectedInColumn =
                       selectedCountByTimestamp.get(marker.time) || 0;
 
+                    // Check if this block has a result (win/lose)
+                    const resultData = resultBlocks.get(boxKey);
+                    const isWinningBlock = resultData?.isWin === true;
+                    const isLosingBlock = resultData?.isWin === false;
+
                     // Calculate gradient opacity based on distance from live price line
                     // Closer to live price = brighter, further = darker
+                    // Also consider price distance from current price
                     const distanceFromLivePrice =
                       adjustedPosition - nowPixelPosition;
                     const maxDistance = containerWidth - nowPixelPosition;
-                    const opacityFactor = Math.max(
+                    const positionOpacityFactor = Math.max(
                       0,
                       1 - (distanceFromLivePrice / maxDistance) * 0.7
                     );
+                    
+                    // Dim blocks far from current price (price distance)
+                    const priceDistance = Math.abs(priceLevel - currentPrice);
+                    const maxPriceDistance = 70; // $70 away (7 rows)
+                    const priceOpacityFactor = Math.max(
+                      0.3, // Minimum 30% opacity even when far
+                      1 - (priceDistance / maxPriceDistance) * 0.5 // Dim by up to 50%
+                    );
+                    
+                    // Combine both factors
+                    const opacityFactor = positionOpacityFactor * priceOpacityFactor;
 
                     // Style calculations
                     let borderOpacity,
@@ -855,7 +1089,23 @@ export function GameView({ market, userBet }: GameViewProps) {
                       cursor,
                       opacity;
 
-                    if (isPending) {
+                    if (isWinningBlock) {
+                      // WINNING BLOCK: Green glow
+                      borderOpacity = 0.9;
+                      bgOpacity = 0.2;
+                      boxShadow = "0 0 15px rgba(34, 197, 94, 0.8), 0 0 25px rgba(34, 197, 94, 0.4)";
+                      transform = "translateX(-50%)";
+                      cursor = "default";
+                      opacity = 1;
+                    } else if (isLosingBlock) {
+                      // LOSING BLOCK: Fade with red outline
+                      borderOpacity = 0.6;
+                      bgOpacity = 0.05;
+                      boxShadow = "0 0 5px rgba(239, 68, 68, 0.5)";
+                      transform = "translateX(-50%)";
+                      cursor = "default";
+                      opacity = 0.4; // Faded
+                    } else if (isPending) {
                       // Pending bet state: pulsing animation
                       const pulse = Math.sin(Date.now() / 200) * 0.1 + 0.9;
                       borderOpacity = 0.7 * pulse;
@@ -957,10 +1207,10 @@ export function GameView({ market, userBet }: GameViewProps) {
                       cursor = "not-allowed";
                       opacity = 0.5; // More visible while still showing inactive state
                     } else if (isSelected) {
-                      // Selected state: professional, clean, minimal
-                      borderOpacity = 0.9;
-                      bgOpacity = 0.12;
-                      boxShadow = "0 0 6px rgba(251, 146, 60, 0.4)";
+                      // Selected state: strong, obvious, committed feel
+                      borderOpacity = 1;
+                      bgOpacity = 0.25; // Solid fill for commitment
+                      boxShadow = "0 0 12px rgba(251, 146, 60, 0.6), 0 0 20px rgba(251, 146, 60, 0.3)"; // Stronger glow
                       transform = "translateX(-50%)";
                       cursor = "pointer";
                       opacity = 1;
@@ -1006,7 +1256,11 @@ export function GameView({ market, userBet }: GameViewProps) {
                           msUserSelect: 'none',
                           WebkitTouchCallout: 'none',
                           pointerEvents: 'auto', // Boxes need to receive clicks
-                          borderColor: isBlasted
+                          borderColor: isWinningBlock
+                            ? `rgba(34, 197, 94, ${borderOpacity})`
+                            : isLosingBlock
+                            ? `rgba(239, 68, 68, ${borderOpacity})`
+                            : isBlasted
                             ? (() => {
                                 const hasPlayed =
                                   (selectedCountByTimestamp.get(marker.time) ??
@@ -1019,7 +1273,11 @@ export function GameView({ market, userBet }: GameViewProps) {
                               })()
                             : `rgba(251, 146, 60, ${borderOpacity})`,
                           borderWidth: "1.5px",
-                          backgroundColor: isBlasted
+                          backgroundColor: isWinningBlock
+                            ? `rgba(34, 197, 94, ${bgOpacity})`
+                            : isLosingBlock
+                            ? `rgba(239, 68, 68, ${bgOpacity})`
+                            : isBlasted
                             ? (() => {
                                 const hasPlayed =
                                   (selectedCountByTimestamp.get(marker.time) ??
@@ -1035,9 +1293,13 @@ export function GameView({ market, userBet }: GameViewProps) {
                           cursor,
                           transition: isBlasted
                             ? "none"
+                            : isWinningBlock || isLosingBlock
+                            ? "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                             : "transform 0.12s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.12s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.12s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.12s cubic-bezier(0.4, 0, 0.2, 1)",
                           opacity: isBlasted
                             ? opacity
+                            : isWinningBlock || isLosingBlock
+                            ? 1
                             : isInNoBetsZone
                             ? 0.5
                             : 1,
@@ -1274,16 +1536,34 @@ export function GameView({ market, userBet }: GameViewProps) {
                             </span>
                           </div>
                         )}
-                        {/* Minimal check icon for selected state - positioned at top-right */}
-                        {isSelected && !isBlasted && (
-                          <div className="absolute top-1 right-1 pointer-events-none">
-                            <div className="bg-orange-500/80 rounded-full p-0.5">
+                        {/* Checkmark icon for selected state - more visible */}
+                        {isSelected && !isBlasted && !isWinningBlock && !isLosingBlock && (
+                          <div className="absolute top-0.5 right-0.5 pointer-events-none z-10">
+                            <div className="bg-orange-500 rounded-full p-1 shadow-lg">
                               <svg
-                                className="w-2.5 h-2.5 text-white"
+                                className="w-3 h-3 text-white"
                                 fill="none"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
-                                strokeWidth="2.5"
+                                strokeWidth="3"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
+                        {/* Win indicator for winning blocks */}
+                        {isWinningBlock && !isBlasted && (
+                          <div className="absolute top-0.5 right-0.5 pointer-events-none z-10">
+                            <div className="bg-emerald-500 rounded-full p-1 shadow-lg animate-pulse">
+                              <svg
+                                className="w-3 h-3 text-white"
+                                fill="none"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="3"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
                               >
@@ -1302,7 +1582,7 @@ export function GameView({ market, userBet }: GameViewProps) {
 
         {/* First vertical reference line (live price line) - with pulse animation */}
         <div
-          className="absolute top-0 bottom-0 w-[2.5px]"
+          className="absolute top-0 bottom-0 w-[2px]"
           style={{
             left: `${verticalLinePositions.referenceLineX}px`,
             transform:
@@ -1312,11 +1592,11 @@ export function GameView({ market, userBet }: GameViewProps) {
                   }px))`
                 : "translateX(-50%)",
             background:
-              "repeating-linear-gradient(to bottom, rgba(251, 146, 60, 0.4) 0px, rgba(251, 146, 60, 0.4) 3px, transparent 3px, transparent 6px)",
+              "repeating-linear-gradient(to bottom, rgba(251, 146, 60, 0.5) 0px, rgba(251, 146, 60, 0.5) 3px, transparent 3px, transparent 6px)",
             boxShadow:
               priceLinePulse > 0
-                ? `0 0 ${6 + priceLinePulse * 4}px rgba(251, 146, 60, ${
-                    0.4 + priceLinePulse * 0.2
+                ? `0 0 ${5 + priceLinePulse * 3}px rgba(251, 146, 60, ${
+                    0.3 + priceLinePulse * 0.15
                   })`
                 : "none",
             transition: "transform 0.1s ease-out, box-shadow 0.2s ease-out",
@@ -1324,17 +1604,18 @@ export function GameView({ market, userBet }: GameViewProps) {
         />
         {/* Second vertical reference line */}
         <div
-          className="absolute top-0 bottom-0 w-[2.5px]"
+          className="absolute top-0 bottom-0 w-[2px]"
           style={{
             left: `${verticalLinePositions.oneMinuteLineX}px`,
             transform: "translateX(-50%)",
             background:
-              "repeating-linear-gradient(to bottom, rgba(251, 146, 60, 0.4) 0px, rgba(251, 146, 60, 0.4) 3px, transparent 3px, transparent 6px)",
+              "repeating-linear-gradient(to bottom, rgba(251, 146, 60, 0.5) 0px, rgba(251, 146, 60, 0.5) 3px, transparent 3px, transparent 6px)",
           }}
         />
       </div>
 
       {/* Left price scale */}
+      {/* Timeline: bottom-8 (32px) + height 128px = 160px, BettingPanel: bottom-[160px] + height ~56px = 216px total */}
       <PriceScale
         currentPrice={currentPrice}
         targetPrice={initialLivePrice ?? market.targetPrice}
@@ -1343,8 +1624,9 @@ export function GameView({ market, userBet }: GameViewProps) {
 
 
       {/* Price line canvas - TradingView-style controls */}
+      {/* Timeline: bottom-8 (32px) + height 128px = 160px, BettingPanel: bottom-[64px] + height ~56px = 120px, use max(160px) */}
       <div 
-        className="absolute left-28 right-0 top-0 bottom-36 select-none"
+        className="absolute left-28 right-0 top-0 bottom-[160px] select-none"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -1373,8 +1655,8 @@ export function GameView({ market, userBet }: GameViewProps) {
             transform: "translateX(-50%)",
           }}
         >
-          <div className="bg-black/90 backdrop-blur-sm px-2.5 py-1.5 rounded-md border border-orange-500/30">
-            <div className="text-[10px] font-mono text-orange-300 font-bold whitespace-nowrap">
+          <div className="bg-black/95 backdrop-blur-md px-3.5 py-2 rounded-lg border border-slate-700/50 shadow-lg">
+            <div className="text-[11px] font-mono text-slate-200 font-semibold whitespace-nowrap">
               {(() => {
                 const date = new Date(currentTime);
                 const hours = String(date.getHours()).padStart(2, "0");
@@ -1390,21 +1672,19 @@ export function GameView({ market, userBet }: GameViewProps) {
       {/* Timeline component */}
       <Timeline
         currentTime={currentTime}
-        viewOffset={viewOffset}
-        onViewOffsetChange={setViewOffset}
       />
 
       {/* HUD Elements */}
-      <div className="absolute top-6 left-28 right-6 flex items-center justify-start z-20">
-        <div className="px-5 py-3 bg-black/70 backdrop-blur-xl rounded-xl border border-orange-500/20">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="text-xs text-slate-300 font-medium">
+      <div className="absolute top-20 left-28 right-6 flex items-center justify-start z-20">
+        <div className="px-5 py-3.5 bg-black/95 backdrop-blur-xl rounded-lg border border-orange-500/20 shadow-xl">
+          <div className="flex items-center gap-2.5 mb-2">
+            <div className="text-[10px] text-slate-300 font-medium uppercase tracking-wide">
               Current Price
             </div>
-            <div className="text-[10px] font-bold text-orange-400 bg-orange-500/25 px-2.5 py-1 rounded-md border border-orange-500/30">
+            <div className="text-[9px] font-semibold text-orange-400 bg-orange-500/20 px-2.5 py-1 rounded border border-orange-500/30">
               BTC/USDT
             </div>
-            <div className="text-[10px] font-semibold text-slate-400 bg-slate-800/60 px-2.5 py-1 rounded-md border border-slate-700/50">
+            <div className="text-[9px] font-medium text-slate-400 px-2 py-0.5">
               BINANCE
             </div>
           </div>
@@ -1417,103 +1697,282 @@ export function GameView({ market, userBet }: GameViewProps) {
         </div>
       </div>
 
+
       {/* User Bet Status */}
       {userBet && (
-        <div className="absolute top-20 sm:top-24 left-28 right-4 sm:right-6 z-20">
-          <div className="px-3 sm:px-4 py-1.5 sm:py-2 bg-orange-500/10 rounded border border-orange-500/20">
-            <div className="text-[10px] sm:text-xs text-orange-400 mb-0.5 sm:mb-1">
+        <div className="absolute top-36 left-28 right-4 sm:right-6 z-20">
+          <div className="px-4 py-2 bg-black/90 backdrop-blur-md rounded-lg border border-slate-700/50 shadow-lg">
+            <div className="text-[10px] sm:text-xs text-slate-400 mb-0.5 uppercase tracking-wide font-medium">
               Your Bet
             </div>
-            <div className="text-xs sm:text-sm font-mono text-orange-300">
+            <div className="text-xs sm:text-sm font-mono text-slate-200 font-bold">
               {userBet.direction.toUpperCase()} - {userBet.amount} tokens
             </div>
           </div>
         </div>
       )}
 
-      {/* Betting Panel */}
-      <BettingPanel />
+      {/* Active Column Emphasis - vertical glow */}
+      {activeColumnTimestamp !== null && (() => {
+        const marker = timelineMarkers.find(m => m.time === activeColumnTimestamp);
+        if (!marker) return null;
+        const adjustedX = marker.xPosition + timelineScrollOffset;
+        return (
+          <div
+            className="absolute top-0 bottom-[160px] pointer-events-none z-[6]"
+            style={{
+              left: `${adjustedX}px`,
+              width: `${TIMELINE_MIN_SPACING * 0.85}px`,
+              transform: 'translateX(-50%)',
+              background: 'linear-gradient(to right, transparent, rgba(251, 146, 60, 0.15), transparent)',
+              boxShadow: '0 0 20px rgba(251, 146, 60, 0.3)',
+              animation: 'pulse 1s ease-in-out',
+            }}
+          />
+        );
+      })()}
+
+      {/* Floating Win Text */}
+      {floatingTexts.map((text) => {
+        const elapsed = (performance.now() - text.startTime) / 1000;
+        const duration = 2; // 2 seconds
+        if (elapsed > duration) return null;
+        
+        const progress = elapsed / duration;
+        const y = text.y - progress * 60; // Float up 60px
+        const opacity = 1 - progress;
+        const scale = 1 + progress * 0.3; // Slight scale up
+        
+        return (
+          <div
+            key={text.id}
+            className="absolute pointer-events-none z-50"
+            style={{
+              left: `${text.x}px`,
+              top: `${y}px`,
+              transform: `translateX(-50%) translateY(-50%) scale(${scale})`,
+              opacity,
+            }}
+          >
+            <div className={`text-lg font-bold font-mono ${
+              text.isWin ? 'text-emerald-400' : 'text-red-400'
+            } drop-shadow-lg`}>
+              +{text.amount}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Clean up floating texts - useEffect handles this */}
+
+      {/* Betting Panel - now empty, instruction moved to Timeline */}
+      <BettingPanel hasActiveBets={selectedBlocks.length > 0} />
+
+      {/* First-time User Onboarding */}
+      {showOnboarding && (
+        <>
+          <div 
+            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm" 
+            onClick={() => {
+              setShowOnboarding(false);
+              localStorage.setItem('signals-onboarding-seen', 'true');
+            }}
+          ></div>
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-[90%] max-w-md">
+            <div className="bg-black backdrop-blur-xl rounded-xl border border-slate-800/50 shadow-2xl p-6 animate-fade-in">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <svg className="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>Welcome to Signals!</span>
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowOnboarding(false);
+                    localStorage.setItem('signals-onboarding-seen', 'true');
+                  }}
+                  className="text-slate-400 hover:text-white transition-colors p-1"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="space-y-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-orange-500/20 rounded-full flex items-center justify-center text-sm font-bold text-orange-400 flex-shrink-0 mt-0.5">1</div>
+                  <div className="flex-1">
+                    <h4 className="text-white font-semibold mb-1.5 text-sm">Click Price Blocks</h4>
+                    <p className="text-slate-300 text-xs leading-relaxed">
+                      Select price blocks in the grid to place your bets. Each block costs <span className="text-orange-400 font-semibold">100 tokens</span>.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-orange-500/20 rounded-full flex items-center justify-center text-sm font-bold text-orange-400 flex-shrink-0 mt-0.5">2</div>
+                  <div className="flex-1">
+                    <h4 className="text-white font-semibold mb-1.5 text-sm">Watch the Price Line</h4>
+                    <p className="text-slate-300 text-xs leading-relaxed">
+                      The orange line shows the live BTC price. It moves from right to left as time passes.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-orange-500/20 rounded-full flex items-center justify-center text-sm font-bold text-orange-400 flex-shrink-0 mt-0.5">3</div>
+                  <div className="flex-1">
+                    <h4 className="text-white font-semibold mb-1.5 text-sm">Win When Price Hits</h4>
+                    <p className="text-slate-300 text-xs leading-relaxed">
+                      If the price line hits your selected block, you win <span className="text-emerald-400 font-semibold">5× your bet</span> instantly!
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => {
+                  setShowOnboarding(false);
+                  localStorage.setItem('signals-onboarding-seen', 'true');
+                }}
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors text-sm"
+              >
+                Got it, let's play!
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Error message for max selections */}
       {maxSelectionError && (
-        <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-40 animate-fade-in">
-          <div className="px-4 py-2.5 bg-red-500/90 backdrop-blur-sm rounded-lg border border-red-400/50">
-            <p className="text-sm font-medium text-white text-center">
+        <div className="absolute bottom-[200px] left-1/2 transform -translate-x-1/2 z-40 animate-fade-in">
+          <div className="px-6 py-3.5 bg-red-600 backdrop-blur-md rounded-xl border border-red-400/70 shadow-2xl">
+            <p className="text-sm font-semibold text-white text-center">
               {maxSelectionError}
             </p>
           </div>
         </div>
       )}
 
-      {/* Info note in footer */}
-      <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-30 pointer-events-none">
-        <div className="px-4 py-2 bg-black/70 backdrop-blur-md rounded-lg border border-orange-500/20">
-          <p className="text-xs text-slate-300 text-center font-medium">
-            Maximum 5 boxes per column • Win 5x if price hits • Click to select • Drag to pan • Double-click to reset
-          </p>
-        </div>
-      </div>
 
-      {/* Win/Lose Notification Popup - Professional & Gamified */}
+      {/* Win/Lose Notification Popup - Professional & Enhanced UX */}
       {gameResult && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none">
-          <div
-            className={`px-8 py-5 rounded-xl border-2 backdrop-blur-lg ${
-              gameResult.type === "win"
-                ? "bg-green-500/20 border-green-400/50"
-                : "bg-red-500/20 border-red-400/50"
-            }`}
-            style={{
-              animation:
-                "fadeInScaleBounce 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)",
-            }}
-          >
-            <div className="flex flex-col items-center gap-2">
-              {gameResult.type === "win" ? (
-                <div className="relative">
-                  <div className="absolute inset-0 bg-green-400/30 rounded-full blur-xl animate-pulse"></div>
-                  <svg
-                    className="w-10 h-10 text-green-300 relative z-10"
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="3"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-              ) : (
-                <div className="relative">
-                  <div className="absolute inset-0 bg-red-400/30 rounded-full blur-xl animate-pulse"></div>
-                  <svg
-                    className="w-10 h-10 text-red-300 relative z-10"
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="3"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-              )}
-              <div className="text-center">
-                <p
-                  className={`text-2xl font-extrabold tracking-tight ${
+        <>
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-md pointer-events-none transition-opacity duration-500"></div>
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none">
+            <div
+              className={`relative px-12 py-8 rounded-3xl border-2 backdrop-blur-2xl shadow-2xl overflow-hidden ${
+                gameResult.type === "win"
+                  ? "bg-gradient-to-br from-green-600/98 via-green-700/95 to-green-800/98 border-green-400/90 shadow-green-500/50"
+                  : "bg-gradient-to-br from-red-600/98 via-red-700/95 to-red-800/98 border-red-400/90 shadow-red-500/50"
+              }`}
+              style={{
+                animation: "fadeInScaleBounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)",
+              }}
+            >
+              {/* Animated background glow */}
+              <div className={`absolute inset-0 opacity-30 ${
+                gameResult.type === "win" ? "bg-green-400" : "bg-red-400"
+              } animate-pulse blur-3xl`}></div>
+              
+              {/* Shine effect overlay */}
+              <div 
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none"
+                style={{
+                  animation: 'shine 2s ease-in-out infinite',
+                }}
+              ></div>
+              
+              <div className="relative z-10 flex flex-col items-center gap-4">
+                {/* Icon with enhanced animation */}
+                {gameResult.type === "win" ? (
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-green-400/60 rounded-full blur-2xl animate-ping"></div>
+                    <div className="absolute inset-0 bg-green-400/40 rounded-full blur-xl animate-pulse"></div>
+                    <div className="relative bg-green-500/20 rounded-full p-4 backdrop-blur-sm border-2 border-green-400/50">
+                      <svg
+                        className="w-16 h-16 text-green-200 drop-shadow-lg"
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="3"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        style={{
+                          animation: "scaleIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)",
+                        }}
+                      >
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-red-400/60 rounded-full blur-2xl animate-ping"></div>
+                    <div className="absolute inset-0 bg-red-400/40 rounded-full blur-xl animate-pulse"></div>
+                    <div className="relative bg-red-500/20 rounded-full p-4 backdrop-blur-sm border-2 border-red-400/50">
+                      <svg
+                        className="w-16 h-16 text-red-200 drop-shadow-lg"
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="3"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        style={{
+                          animation: "scaleIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)",
+                        }}
+                      >
+                        <path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Title */}
+                <div className="text-center">
+                  <h3 className={`text-3xl font-black tracking-tight mb-2 ${
                     gameResult.type === "win"
-                      ? "text-green-200"
-                      : "text-red-200"
-                  }`}
-                >
-                  {gameResult.message}
-                </p>
+                      ? "text-green-50 drop-shadow-lg"
+                      : "text-red-50 drop-shadow-lg"
+                  }`}>
+                    {gameResult.type === "win" ? "🎉 VICTORY!" : "❌ DEFEAT"}
+                  </h3>
+                  <p
+                    className={`text-lg font-bold tracking-wide ${
+                      gameResult.type === "win"
+                        ? "text-green-100"
+                        : "text-red-100"
+                    }`}
+                  >
+                    {gameResult.message}
+                  </p>
+                </div>
+                
+                {/* Decorative particles */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-3xl">
+                  {[...Array(6)].map((_, i) => (
+                    <div
+                      key={i}
+                      className={`absolute w-2 h-2 rounded-full ${
+                        gameResult.type === "win" ? "bg-green-300" : "bg-red-300"
+                      } opacity-60`}
+                      style={{
+                        left: `${20 + i * 15}%`,
+                        top: `${30 + (i % 2) * 40}%`,
+                        animation: `floatUp ${2 + i * 0.3}s ease-out forwards`,
+                        animationDelay: `${i * 0.1}s`,
+                      }}
+                    ></div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

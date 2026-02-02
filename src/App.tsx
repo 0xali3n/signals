@@ -28,15 +28,15 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black">
+    <div className="min-h-screen bg-black">
       <Header />
       
       {!wallet || (creationStep !== 'idle' && creationStep !== 'complete') ? (
-        <div className="flex items-center justify-center min-h-[calc(100vh-88px)]">
+        <div className="flex items-center justify-center min-h-[calc(100vh-52px)]">
           <WalletSetup />
         </div>
         ) : (
-          <div className="fixed inset-0 top-[72px] pb-20">
+          <div className="fixed inset-0 top-[52px]">
             <GameView 
               market={marketState.market} 
               userBet={marketState.userBet}

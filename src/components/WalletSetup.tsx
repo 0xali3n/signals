@@ -109,11 +109,11 @@ export function WalletSetup() {
   }
 
   return (
-    <div className="glass-strong rounded-xl p-6 sm:p-8 max-w-md mx-auto border border-amber-200/60 shadow-md">
-      <h2 className="text-lg sm:text-xl font-semibold mb-4 sm:mb-6 text-slate-800 text-center">Connect Your Microchain</h2>
+    <div className="bg-black/95 backdrop-blur-xl rounded-xl p-6 sm:p-8 max-w-md mx-auto border border-slate-800/50 shadow-2xl">
+      <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-white text-center">Connect Your Microchain</h2>
       
       {error && (
-        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs sm:text-sm">
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-500/20 border border-red-500/30 rounded-lg text-red-300 text-xs sm:text-sm">
           {error}
         </div>
       )}
@@ -121,8 +121,8 @@ export function WalletSetup() {
       {!showImport ? (
         <div className="space-y-4 sm:space-y-6">
           <div className="text-center mb-4 sm:mb-6">
-            <h3 className="text-base sm:text-lg font-semibold mb-2 text-slate-800">Secure Your Microchain</h3>
-            <p className="text-xs sm:text-sm text-slate-600">
+            <h3 className="text-base sm:text-lg font-semibold mb-2 text-white">Secure Your Microchain</h3>
+            <p className="text-xs sm:text-sm text-slate-400">
               Create a new wallet or import an existing one
             </p>
           </div>
@@ -130,11 +130,11 @@ export function WalletSetup() {
           <button
             onClick={handleCreate}
             disabled={isCreating}
-            className="w-full px-4 sm:px-6 py-2.5 sm:py-3 bg-saffron hover:opacity-90 text-white text-sm sm:text-base font-medium rounded-lg transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full px-4 sm:px-6 py-3 sm:py-3.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white text-sm sm:text-base font-semibold rounded-lg transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isCreating ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                 <span>Creating Wallet...</span>
               </>
             ) : (
@@ -149,16 +149,16 @@ export function WalletSetup() {
           
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/20"></div>
+              <div className="w-full border-t border-slate-700/50"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white/10 text-white/60">or</span>
+              <span className="px-3 bg-black/95 text-slate-400">or</span>
             </div>
           </div>
 
           <button
             onClick={() => setShowImport(true)}
-            className="w-full px-6 py-3 glass hover:bg-white/80 text-slate-700 font-medium rounded-lg transition-all border border-amber-200/50 flex items-center justify-center gap-2"
+            className="w-full px-6 py-3 bg-slate-900/80 hover:bg-slate-800/80 text-slate-200 font-medium rounded-lg transition-all border border-slate-700/50 hover:border-slate-600/70 flex items-center justify-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -166,8 +166,8 @@ export function WalletSetup() {
             <span>Import Existing Wallet</span>
           </button>
           
-          <div className="glass rounded-lg p-3 border border-amber-200/50">
-            <p className="text-xs text-slate-600 text-center">
+          <div className="bg-slate-900/60 rounded-lg p-3 border border-slate-800/50">
+            <p className="text-xs text-slate-400 text-center">
               Your private key is stored locally in your browser
             </p>
           </div>
@@ -175,8 +175,8 @@ export function WalletSetup() {
       ) : (
         <div className="space-y-6">
           <div className="text-center mb-4">
-            <h3 className="text-lg font-semibold mb-1 text-slate-800">Import Wallet</h3>
-            <p className="text-sm text-slate-600">Upload your exported wallet JSON file</p>
+            <h3 className="text-lg font-semibold mb-1 text-white">Import Wallet</h3>
+            <p className="text-sm text-slate-400">Upload your exported wallet JSON file</p>
           </div>
 
           <div>
@@ -189,20 +189,20 @@ export function WalletSetup() {
             />
             <label
               htmlFor="wallet-file-input"
-              className="flex flex-col items-center justify-center gap-3 w-full px-6 py-12 rounded-lg glass hover:bg-white/80 border-2 border-dashed border-amber-300/50 text-slate-700 cursor-pointer transition-all"
+              className="flex flex-col items-center justify-center gap-3 w-full px-6 py-12 rounded-lg bg-slate-900/60 hover:bg-slate-800/60 border-2 border-dashed border-orange-500/30 hover:border-orange-500/50 text-slate-300 cursor-pointer transition-all"
             >
-              <svg className="w-12 h-12 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-12 h-12 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
               <div className="text-center">
-                <p className="font-medium text-slate-700">{fileName || 'Click to upload wallet file'}</p>
+                <p className="font-medium text-white">{fileName || 'Click to upload wallet file'}</p>
                 {!fileName && (
                   <p className="text-xs text-slate-500 mt-1">JSON file only</p>
                 )}
               </div>
             </label>
             {fileName && (
-              <p className="text-xs text-emerald-600 mt-2 text-center flex items-center justify-center gap-1">
+              <p className="text-xs text-emerald-400 mt-2 text-center flex items-center justify-center gap-1">
                 <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
@@ -214,11 +214,11 @@ export function WalletSetup() {
           <button
             onClick={handleImport}
             disabled={isImporting || !importData.trim()}
-            className="w-full px-6 py-3 bg-saffron hover:opacity-90 text-white rounded-lg transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
+            className="w-full px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
           >
             {isImporting ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                 <span>Connecting...</span>
               </>
             ) : (
@@ -239,7 +239,7 @@ export function WalletSetup() {
               setFileName(null);
             }}
             disabled={isImporting}
-            className="w-full px-4 py-2.5 glass hover:bg-white/80 text-slate-700 rounded-lg transition-all border border-amber-200/50 disabled:opacity-50"
+            className="w-full px-4 py-2.5 bg-slate-900/80 hover:bg-slate-800/80 text-slate-300 rounded-lg transition-all border border-slate-700/50 hover:border-slate-600/70 disabled:opacity-50"
           >
             Cancel
           </button>

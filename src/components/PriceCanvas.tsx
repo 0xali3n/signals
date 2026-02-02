@@ -67,9 +67,9 @@ export function PriceCanvas({
           priceChangeAnimationRef.current = 1;
       }
 
-      // Draw grid lines
-      ctx.strokeStyle = "rgba(251, 146, 60, 0.08)";
-      ctx.lineWidth = 1;
+      // Draw subtle grid lines - minimal for clean professional look
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
+      ctx.lineWidth = 0.5;
       for (let i = 0; i <= 15; i++) {
         const y = (canvas.height / 15) * i;
         ctx.beginPath();
@@ -256,19 +256,20 @@ export function PriceCanvas({
         const leftLineX = Math.min(referenceLineX, oneMinuteLineX);
         const rightLineX = Math.max(referenceLineX, oneMinuteLineX);
         const fillWidth = rightLineX - leftLineX;
-        ctx.fillStyle = "rgba(255, 165, 0, 0.05)";
+        ctx.fillStyle = "rgba(251, 146, 60, 0.06)";
         ctx.fillRect(leftLineX, 0, fillWidth, canvas.height);
 
-        // Draw "betting closed" text - friendlier message
+        // Draw "NO BET ZONE" text at top - professional styling
         const textX = leftLineX + fillWidth / 2;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
-        ctx.lineWidth = 3;
-        ctx.font = "bold 13px system-ui, -apple-system, sans-serif";
-        ctx.strokeText("Betting closed for this round", textX, 12);
-        ctx.fillStyle = "rgba(255, 165, 0, 0.75)";
-        ctx.fillText("Betting closed for this round", textX, 12);
+        const textY = 60; // Position lower to avoid navbar overlap
+        ctx.strokeStyle = "rgba(0, 0, 0, 1)";
+        ctx.lineWidth = 6;
+        ctx.font = "bold 16px system-ui, -apple-system, sans-serif";
+        ctx.strokeText("NO BET ZONE", textX, textY);
+        ctx.fillStyle = "rgba(251, 146, 60, 1)";
+        ctx.fillText("NO BET ZONE", textX, textY);
         ctx.textAlign = "start";
         ctx.textBaseline = "alphabetic";
 
@@ -296,11 +297,21 @@ export function PriceCanvas({
         const indicatorX = smoothedXRef.current;
         const indicatorY = currentY;
 
-        // Clean indicator without excessive glow
-        const pulseSize = 5;
+        // Premium indicator with subtle glow
+        const pulseSize = 6;
 
+        // Outer glow ring
+        ctx.fillStyle = "rgba(244, 196, 48, 0.3)";
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = "rgba(244, 196, 48, 0.4)";
+        ctx.beginPath();
+        ctx.arc(indicatorX, indicatorY, pulseSize + 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Main indicator
         ctx.fillStyle = "#F4C430";
-        ctx.shadowBlur = 0;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = "rgba(244, 196, 48, 0.6)";
         ctx.beginPath();
         ctx.arc(indicatorX, indicatorY, pulseSize, 0, Math.PI * 2);
         ctx.fill();

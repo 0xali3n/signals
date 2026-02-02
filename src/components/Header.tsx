@@ -1,14 +1,37 @@
 // Main header component with wallet address display
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWalletStore } from '../store/walletStore';
 import { exportWallet } from '../utils/wallet';
+import { getBettingHistory, type BettingHistoryEntry } from '../utils/bettingHistory';
 
 export function Header() {
   const { wallet, username, balance, deleteWallet } = useWalletStore();
   const [showMenu, setShowMenu] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showGameInfo, setShowGameInfo] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [bettingHistory, setBettingHistory] = useState<BettingHistoryEntry[]>([]);
+
+  // Load betting history when wallet changes or history modal opens (filtered by wallet address)
+  useEffect(() => {
+    if (wallet?.address) {
+      // Always load history when wallet is available
+      setBettingHistory(getBettingHistory(wallet.address));
+      
+      // If history modal is open, refresh more frequently
+      if (showHistory) {
+        const interval = setInterval(() => {
+          if (wallet?.address) {
+            setBettingHistory(getBettingHistory(wallet.address));
+          }
+        }, 1000); // Refresh every 1 second while modal is open
+        return () => clearInterval(interval);
+      }
+    } else {
+      setBettingHistory([]);
+    }
+  }, [showHistory, wallet?.address]);
 
 
   const handleDisconnect = () => {
@@ -38,29 +61,29 @@ export function Header() {
 
 
   return (
-    <header className="bg-black/95 backdrop-blur-xl sticky top-0 z-50 border-b border-orange-500/20">
-      <div className="container mx-auto px-6 sm:px-8 py-4 max-w-full">
-        <div className="flex items-center justify-between gap-6">
+    <header className="bg-black/98 backdrop-blur-xl sticky top-0 z-50 border-b border-slate-800/50 shadow-lg">
+      <div className="container mx-auto px-5 sm:px-6 py-2 max-w-full">
+        <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-slate-800/50 border border-orange-500/20">
-                <img 
-                  src="/logo.png" 
-                  alt="Signals" 
-                  className="w-10 h-10 object-contain"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    if (target.parentElement) {
-                      target.parentElement.innerHTML = '<span class="text-orange-400 font-bold text-xl">S</span>';
-                    }
-                  }}
-                />
-              </div>
+            <div className="flex items-center gap-4">
+              <img 
+                src="/logo.png" 
+                alt="Signals" 
+                className="w-16 h-16 object-contain flex-shrink-0"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  if (target.parentElement) {
+                    target.parentElement.innerHTML = '<span class="text-orange-400 font-bold text-4xl">S</span>';
+                  }
+                }}
+              />
               <div className="flex flex-col">
-                <h1 className="text-lg font-bold text-orange-300 tracking-tight">Signals</h1>
-                <span className="text-[10px] px-2 py-0.5 bg-orange-500/15 text-orange-400 rounded-md font-medium border border-orange-500/30 whitespace-nowrap">
+                <span className="text-[12px] text-slate-400 font-medium whitespace-nowrap">
                   Conway Testnet
+                </span>
+                <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap italic">
+                  Real-time Crypto Prediction
                 </span>
               </div>
             </div>
@@ -68,17 +91,21 @@ export function Header() {
             {/* Game Info Button */}
             <div className="relative">
               <button
-                onClick={() => setShowGameInfo(!showGameInfo)}
-                className="p-2 hover:bg-orange-500/10 rounded-lg transition-colors border border-orange-500/20 hover:border-orange-500/30 group"
+                onClick={() => {
+                  setShowGameInfo(!showGameInfo);
+                }}
+                className="p-1.5 hover:bg-slate-800/50 rounded-md transition-colors group border border-transparent hover:border-slate-700/50"
                 aria-label="How to Play"
+                title="How to Play"
               >
                 <svg 
-                  className="w-5 h-5 text-orange-400 group-hover:text-orange-300 transition-colors" 
+                  className="w-4 h-4 text-slate-400 group-hover:text-orange-400 transition-colors" 
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"
+                  strokeWidth={2.5}
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </button>
 
@@ -86,89 +113,76 @@ export function Header() {
                 <>
                   <div 
                     className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" 
-                    onClick={() => setShowGameInfo(false)}
+                    onClick={() => {
+                      setShowGameInfo(false);
+                    }}
                   ></div>
                   <div 
-                    className="absolute left-0 top-full mt-2 w-[calc(100vw-3rem)] sm:w-80 md:w-96 max-w-md bg-black/95 backdrop-blur-md rounded-xl border border-orange-500/20 z-50 p-4 sm:p-5 md:p-6 animate-fade-in overflow-y-auto"
+                    className="absolute left-0 top-full mt-2 w-[calc(100vw-3rem)] sm:w-80 md:w-96 max-w-md bg-black backdrop-blur-md rounded-lg border border-slate-800/50 z-50 shadow-2xl transition-all duration-300 p-4 animate-fade-in"
                     style={{ 
-                      maxHeight: 'calc(100vh - 8rem)'
+                      maxHeight: 'calc(100vh - 6rem)',
+                      overflow: 'hidden'
                     }}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex items-center justify-between mb-3 sm:mb-4">
-                      <h3 className="text-lg sm:text-xl font-bold text-orange-300 flex items-center gap-2">
-                        <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span className="text-base sm:text-xl">How to Play</span>
+                        <span>How to Play</span>
                       </h3>
                       <button
-                        onClick={() => setShowGameInfo(false)}
-                        className="text-slate-400 hover:text-orange-400 transition-colors p-1 flex-shrink-0"
+                        onClick={() => {
+                          setShowGameInfo(false);
+                        }}
+                        className="text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 transition-all p-1.5 rounded-md flex-shrink-0 border border-transparent hover:border-orange-500/30"
                         aria-label="Close"
+                        title="Close"
                       >
-                        <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       </button>
                     </div>
 
-                    <div className="space-y-2.5 sm:space-y-3.5">
-                      <div className="bg-slate-900/50 rounded-lg p-2.5 sm:p-3 border border-orange-500/10">
-                        <div className="flex items-start gap-2 sm:gap-3">
-                          <span className="w-6 h-6 sm:w-7 sm:h-7 bg-orange-500/20 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold text-orange-400 flex-shrink-0">1</span>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-orange-400 font-semibold mb-1 text-xs sm:text-sm">Select Blocks</h4>
-                            <p className="text-slate-400 text-[10px] sm:text-xs leading-relaxed">
-                              Click blocks to select. Max <strong className="text-orange-400">3 per column</strong>. Each block = one price level.
+                    <div className="space-y-3">
+                      {/* Step 1: What happens */}
+                      <div className="bg-slate-900/60 rounded-lg p-3.5 border border-slate-800/50">
+                        <div className="flex items-start gap-3">
+                          <div className="w-7 h-7 bg-orange-500/20 rounded-full flex items-center justify-center text-xs font-bold text-orange-400 flex-shrink-0 mt-0.5">1</div>
+                          <div className="flex-1">
+                            <h4 className="text-white font-semibold mb-1.5 text-sm">Click a Price Block</h4>
+                            <p className="text-slate-300 text-xs leading-relaxed">
+                              Click any orange block in the grid. You bet <span className="text-orange-400 font-semibold">100 tokens</span>. You can select up to <span className="text-orange-400 font-semibold">5 blocks per column</span>.
                             </p>
                           </div>
                         </div>
                       </div>
 
-                      <div className="bg-slate-900/50 rounded-lg p-2.5 sm:p-3 border border-orange-500/10">
-                        <div className="flex items-start gap-2 sm:gap-3">
-                          <span className="w-6 h-6 sm:w-7 sm:h-7 bg-orange-500/20 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold text-orange-400 flex-shrink-0">2</span>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-orange-400 font-semibold mb-1 text-xs sm:text-sm">Place Bet</h4>
-                            <p className="text-slate-400 text-[10px] sm:text-xs leading-relaxed">
-                              <strong className="text-orange-400">100 tokens</strong> per block. Added to <strong className="text-orange-400">column pool</strong>. Multiple users can bet.
+                      {/* Step 2: What happens */}
+                      <div className="bg-slate-900/60 rounded-lg p-3.5 border border-slate-800/50">
+                        <div className="flex items-start gap-3">
+                          <div className="w-7 h-7 bg-orange-500/20 rounded-full flex items-center justify-center text-xs font-bold text-orange-400 flex-shrink-0 mt-0.5">2</div>
+                          <div className="flex-1">
+                            <h4 className="text-white font-semibold mb-1.5 text-sm">Price Line Moves</h4>
+                            <p className="text-slate-300 text-xs leading-relaxed">
+                              The yellow line shows live BTC price. It moves from <span className="text-yellow-400 font-semibold">right → left</span> as time passes. Watch it move toward your selected block.
                             </p>
                           </div>
                         </div>
                       </div>
 
-                      <div className="bg-slate-900/50 rounded-lg p-2.5 sm:p-3 border border-orange-500/10">
-                        <div className="flex items-start gap-2 sm:gap-3">
-                          <span className="w-6 h-6 sm:w-7 sm:h-7 bg-orange-500/20 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold text-orange-400 flex-shrink-0">3</span>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-orange-400 font-semibold mb-1 text-xs sm:text-sm">Watch & Win</h4>
-                            <p className="text-slate-400 text-[10px] sm:text-xs leading-relaxed">
-                              Live price line moves right to left. When it hits your block → <strong className="text-orange-400">You Win!</strong>
+                      {/* Step 3: What happens */}
+                      <div className="bg-slate-900/60 rounded-lg p-3.5 border border-slate-800/50">
+                        <div className="flex items-start gap-3">
+                          <div className="w-7 h-7 bg-orange-500/20 rounded-full flex items-center justify-center text-xs font-bold text-orange-400 flex-shrink-0 mt-0.5">3</div>
+                          <div className="flex-1">
+                            <h4 className="text-white font-semibold mb-1.5 text-sm">You Win or Lose</h4>
+                            <p className="text-slate-300 text-xs leading-relaxed">
+                              <span className="text-emerald-400 font-semibold">If the line hits your block → You WIN!</span> You get <span className="text-emerald-400 font-semibold">500 tokens (5× your bet)</span> instantly. If it doesn't hit, you lose your 100 tokens.
                             </p>
                           </div>
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-900/50 rounded-lg p-2.5 sm:p-3 border border-orange-500/10">
-                        <div className="flex items-start gap-2 sm:gap-3">
-                          <span className="w-6 h-6 sm:w-7 sm:h-7 bg-orange-500/20 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold text-orange-400 flex-shrink-0">4</span>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-orange-400 font-semibold mb-1 text-xs sm:text-sm">Rewards</h4>
-                            <p className="text-slate-400 text-[10px] sm:text-xs leading-relaxed">
-                              Winners get <strong className="text-orange-400">2x their bet amount</strong> instantly. Rewards are managed locally for fast gameplay.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 mt-2 sm:mt-3 border-t border-orange-500/20">
-                        <div className="flex items-start gap-2 sm:gap-2.5 bg-orange-500/10 rounded-lg p-2.5 sm:p-3 border border-orange-500/20">
-                          <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                          </svg>
-                            <p className="text-[10px] sm:text-xs text-slate-400 leading-relaxed">
-                            <strong className="text-orange-300">Local:</strong> All bets & rewards managed locally for fast, smooth gameplay.
-                          </p>
                         </div>
                       </div>
                     </div>
@@ -180,39 +194,194 @@ export function Header() {
 
           {wallet && (
             <div className="flex items-center gap-4 relative">
-              {/* Balance Display */}
-              <div className="text-right pr-4 border-r border-orange-500/30">
-                <div className="flex items-center gap-2 justify-end mb-1">
-                  <svg className="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              {/* History Button - Highlighted */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="p-2 bg-orange-500/20 hover:bg-orange-500/30 rounded-lg transition-all group border border-orange-500/40 hover:border-orange-500/60 shadow-md hover:shadow-lg hover:shadow-orange-500/20"
+                  aria-label="Betting History"
+                  title="View Betting History"
+                >
+                  <svg 
+                    className="w-5 h-5 text-orange-400 group-hover:text-orange-300 transition-colors" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                    strokeWidth={2.5}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-sm font-mono font-bold text-orange-300">
+                </button>
+
+                {showHistory && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" 
+                      onClick={() => setShowHistory(false)}
+                    ></div>
+                    <div 
+                      className="absolute right-0 top-full mt-2 w-[calc(100vw-3rem)] sm:w-96 md:w-[500px] max-w-md bg-black backdrop-blur-md rounded-lg border border-slate-800/50 z-50 p-4 animate-fade-in shadow-2xl"
+                      style={{ 
+                        maxHeight: 'calc(100vh - 6rem)',
+                        overflow: 'hidden'
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                          <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>Betting History</span>
+                        </h3>
+                        <button
+                          onClick={() => setShowHistory(false)}
+                          className="text-orange-400 hover:text-orange-300 hover:bg-orange-500/10 transition-all p-1.5 rounded-md flex-shrink-0 border border-transparent hover:border-orange-500/30"
+                          aria-label="Close"
+                          title="Close"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      <div className="space-y-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
+                        {bettingHistory.length === 0 ? (
+                          <div className="text-center py-8">
+                            <p className="text-slate-400 text-sm">No betting history yet</p>
+                            <p className="text-slate-500 text-xs mt-1">Your betting activity will appear here</p>
+                          </div>
+                        ) : (
+                          bettingHistory.map((entry) => {
+                            const betDate = new Date(entry.betTime);
+                            const timeStr = betDate.toLocaleTimeString('en-US', { 
+                              hour: '2-digit', 
+                              minute: '2-digit',
+                              second: '2-digit'
+                            });
+                            const dateStr = betDate.toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric'
+                            });
+
+                            return (
+                              <div
+                                key={entry.id}
+                                className={`bg-slate-900/60 rounded-lg p-3 border ${
+                                  entry.result === 'win'
+                                    ? 'border-emerald-500/30'
+                                    : entry.result === 'lose'
+                                    ? 'border-red-500/30'
+                                    : 'border-slate-800/50'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                      <span className="text-xs text-slate-400 font-mono">
+                                        {dateStr} {timeStr}
+                                      </span>
+                                      {entry.result === 'win' && (
+                                        <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] font-semibold rounded border border-emerald-500/30">
+                                          WIN
+                                        </span>
+                                      )}
+                                      {entry.result === 'lose' && (
+                                        <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-[10px] font-semibold rounded border border-red-500/30">
+                                          LOSE
+                                        </span>
+                                      )}
+                                      {entry.result === 'pending' && (
+                                        <span className="px-2 py-0.5 bg-orange-500/20 text-orange-400 text-[10px] font-semibold rounded border border-orange-500/30">
+                                          PENDING
+                                        </span>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="space-y-1 text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-slate-400">Price Level:</span>
+                                        <span className="text-white font-mono font-semibold">
+                                          ${entry.priceLevel.toLocaleString()}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-slate-400">Bet Amount:</span>
+                                        <span className="text-orange-400 font-mono font-semibold">
+                                          {entry.betAmount} tokens
+                                        </span>
+                                      </div>
+                                      {entry.actualPrice && (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-slate-400">Actual Price:</span>
+                                          <span className="text-slate-300 font-mono">
+                                            ${entry.actualPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {entry.payout !== undefined && (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-slate-400">Payout:</span>
+                                          <span className="text-emerald-400 font-mono font-semibold">
+                                            +{entry.payout} tokens
+                                          </span>
+                                        </div>
+                                      )}
+                                      {entry.netGain !== undefined && (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-slate-400">Net:</span>
+                                          <span className={`font-mono font-semibold ${
+                                            entry.netGain > 0 ? 'text-emerald-400' : 'text-red-400'
+                                          }`}>
+                                            {entry.netGain > 0 ? '+' : ''}{entry.netGain} tokens
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Balance Display */}
+              <div className="text-right pr-4">
+                <div className="flex items-center gap-3 justify-end mb-0.5">
+                  <p className="text-lg font-mono font-bold text-white">
                     {balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
+                  <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Balance</span>
                 </div>
-                <div className="flex items-center justify-end gap-2">
-                  <p className="text-[10px] text-slate-400 font-medium">Balance</p>
-                  <span className="text-[9px] text-slate-500">•</span>
-                  <p className="text-[10px] text-slate-400">Each bet = <span className="text-orange-400 font-mono font-semibold">100</span></p>
+                <div className="flex items-center gap-3 justify-end text-[9px] text-slate-500">
+                  <span>1 bet = <span className="text-orange-400 font-semibold hover:text-orange-300 cursor-pointer transition-colors">100</span></span>
+                  <span>•</span>
+                  <span>Win = <span className="text-emerald-400 font-semibold hover:text-emerald-300 cursor-pointer transition-colors">5×</span> payout</span>
                 </div>
               </div>
 
-              <div className="text-right hidden sm:block pr-4 border-r border-orange-500/30">
+              <div className="text-right hidden sm:block pr-4">
                 {username && (
-                  <p className="text-sm font-semibold text-orange-300 mb-1 truncate max-w-[140px]">
+                  <p className="text-sm font-semibold text-white mb-1 truncate max-w-[140px]">
                     {username}
                   </p>
                 )}
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse flex-shrink-0"></div>
-                  <p className="text-xs font-mono text-orange-400/90 truncate">
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full flex-shrink-0"></div>
+                  <p className="text-xs font-mono text-slate-300 truncate">
                     {wallet.address.slice(0, 8)}...{wallet.address.slice(-6)}
                   </p>
                 </div>
                 {wallet.chainId && (
                   <button
                     onClick={() => setShowDetails(!showDetails)}
-                    className="text-xs text-orange-400/80 hover:text-orange-300 mt-1.5 transition-colors font-medium"
+                    className="text-xs text-orange-400 hover:text-orange-300 mt-1.5 transition-colors font-medium underline decoration-orange-400/50 hover:decoration-orange-300"
                   >
                     {showDetails ? 'Hide' : 'View'} Details
                   </button>
@@ -222,28 +391,28 @@ export function Header() {
               {showDetails && wallet.chainId && (
                 <>
                   <div 
-                    className="fixed inset-0 z-20" 
+                    className="fixed inset-0 z-20 bg-black/40 backdrop-blur-sm" 
                     onClick={() => setShowDetails(false)}
                   ></div>
-                  <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-black/90 backdrop-blur-md rounded-lg border border-orange-500/20 z-30 p-3 sm:p-4 animate-fade-in">
-                    <div className="space-y-2 sm:space-y-3">
+                  <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-black/98 backdrop-blur-xl rounded-lg border border-slate-800/50 z-30 p-4 sm:p-5 animate-fade-in shadow-2xl">
+                    <div className="space-y-3 sm:space-y-4">
                       <div>
-                        <p className="text-[10px] sm:text-xs text-slate-400 mb-1">Wallet Address</p>
-                        <p className="text-[10px] sm:text-xs font-mono text-orange-300 break-all">{wallet.address}</p>
+                        <p className="text-[11px] sm:text-xs text-slate-400 mb-1.5 uppercase tracking-wide">Wallet Address</p>
+                        <p className="text-[11px] sm:text-xs font-mono text-white break-all">{wallet.address}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] sm:text-xs text-slate-400 mb-1">Microchain ID</p>
-                        <p className="text-[10px] sm:text-xs font-mono text-orange-300 break-all">{wallet.chainId}</p>
-                        <p className="text-[10px] sm:text-xs text-orange-400 mt-1 flex items-center gap-1">
-                          <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <p className="text-[11px] sm:text-xs text-slate-400 mb-1.5 uppercase tracking-wide">Microchain ID</p>
+                        <p className="text-[11px] sm:text-xs font-mono text-white break-all">{wallet.chainId}</p>
+                        <p className="text-[11px] sm:text-xs text-emerald-400 mt-2 flex items-center gap-1.5">
+                          <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                           </svg>
                           Chain claimed from faucet
                         </p>
                       </div>
-                      <div className="pt-2 border-t border-orange-500/20">
-                        <p className="text-[10px] sm:text-xs text-slate-400">
-                          Network: <span className="text-orange-400">Conway Testnet</span>
+                      <div className="pt-2 border-t border-slate-800/50">
+                        <p className="text-[11px] sm:text-xs text-slate-400">
+                          Network: <span className="text-white font-medium">Conway Testnet</span>
                         </p>
                       </div>
                     </div>
@@ -254,7 +423,7 @@ export function Header() {
               <div className="relative">
               <button
                 onClick={() => setShowMenu(!showMenu)}
-                className="p-2 hover:bg-orange-500/10 rounded-lg transition-colors border border-orange-500/20 hover:border-orange-500/30"
+                className="p-2 hover:bg-slate-800/50 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
@@ -264,23 +433,23 @@ export function Header() {
                 {showMenu && (
                   <>
                     <div 
-                      className="fixed inset-0 z-10" 
+                      className="fixed inset-0 z-10 bg-black/40 backdrop-blur-sm" 
                       onClick={() => setShowMenu(false)}
                     ></div>
-                    <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-black/90 backdrop-blur-md rounded-lg border border-orange-500/20 z-20 overflow-hidden animate-fade-in">
+                    <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-black backdrop-blur-md rounded-lg border border-slate-800/50 z-20 overflow-hidden animate-fade-in shadow-2xl">
                       <button
                         onClick={handleExport}
-                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-xs sm:text-sm text-orange-300 hover:bg-orange-500/10 transition-colors flex items-center gap-2"
+                        className="w-full px-4 py-2.5 text-left text-xs sm:text-sm text-slate-300 hover:bg-slate-800/50 hover:text-white transition-colors flex items-center gap-2"
                       >
                         <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
                         <span className="truncate">Export Wallet</span>
                       </button>
-                      <div className="h-px bg-orange-500/20"></div>
+                      <div className="h-px bg-slate-800/50"></div>
                       <button
                         onClick={handleDisconnect}
-                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-xs sm:text-sm text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
+                        className="w-full px-4 py-2.5 text-left text-xs sm:text-sm text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2"
                       >
                         <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

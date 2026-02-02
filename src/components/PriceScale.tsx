@@ -23,16 +23,21 @@ export function PriceScale({ currentPrice, targetPrice, panY = 0 }: PriceScalePr
   prices.reverse();
 
   return (
-    <div className="absolute left-0 top-0 bottom-36 w-28 flex flex-col justify-between py-10 z-10 pl-3">
-      {prices.map((price, i) => (
-        <div
-          key={i}
-          className="text-[10px] font-mono text-orange-400/80 tracking-tight mb-1"
-          style={{ lineHeight: '1.2' }}
-        >
-          ${price.toLocaleString(undefined, { maximumFractionDigits: priceIncrement < 1 ? 1 : 0 })}
-        </div>
-      ))}
+    <div className="absolute left-0 top-0 bottom-[160px] w-28 flex flex-col justify-between py-10 z-10 pl-5">
+      {prices.map((price, i) => {
+        const isCurrentPrice = Math.abs(price - currentPrice) < 5;
+        return (
+          <div
+            key={i}
+            className={`text-[12px] font-mono tracking-tight mb-1 ${
+              isCurrentPrice ? 'text-orange-400 font-semibold' : 'text-slate-400'
+            }`}
+            style={{ lineHeight: '1.2' }}
+          >
+            ${price.toLocaleString(undefined, { maximumFractionDigits: priceIncrement < 1 ? 1 : 0 })}
+          </div>
+        );
+      })}
     </div>
   );
 }
