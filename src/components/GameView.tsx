@@ -581,7 +581,7 @@ export function GameView({ market, userBet }: GameViewProps) {
   // Update current time continuously for smooth timeline scrolling
   // Throttle to ~20fps for better performance
   useEffect(() => {
-    let intervalId: number;
+    let intervalId: ReturnType<typeof setInterval>;
     const targetFPS = 20; // Reduced for better performance
     const interval = 1000 / targetFPS;
 

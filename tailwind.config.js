@@ -26,6 +26,10 @@ module.exports = {
         'pulse-slow': 'pulse 2s ease-in-out infinite',
         'glow': 'glow 2s ease-in-out infinite',
       },
+      transitionDelay: {
+        '1000': '1000ms',
+        '2000': '2000ms',
+      },
     },
   },
   plugins: [],
